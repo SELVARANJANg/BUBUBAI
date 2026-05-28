@@ -331,32 +331,23 @@ export default function App() {
     try {
       let targetUsername = "";
 
-      // 1. Try username lookup first
-      const usernameQuery = query(collection(db, "users"), where("username", "==", inputVal), limit(1));
-      const usernameSnap = await runWithRetry(() => getDocs(usernameQuery));
+      // Parallelize all lookup variants to minimize round-trip times and make login faster
+      const [usernameSnap, phoneSnap, rawPhoneSnap] = await Promise.all([
+        runWithRetry(() => getDocs(query(collection(db, "users"), where("username", "==", inputVal), limit(1)))),
+        runWithRetry(() => getDocs(query(collection(db, "users"), where("phoneNumber", "==", cleanPhoneInput), limit(1)))),
+        runWithRetry(() => getDocs(query(collection(db, "users"), where("phoneNumber", "==", loginIdentifier.trim()), limit(1))))
+      ]);
 
       if (!usernameSnap.empty) {
         targetUsername = usernameSnap.docs[0].data().username;
+      } else if (!phoneSnap.empty) {
+        targetUsername = phoneSnap.docs[0].data().username;
+      } else if (!rawPhoneSnap.empty) {
+        targetUsername = rawPhoneSnap.docs[0].data().username;
       } else {
-        // 2. Try normalized phone lookup next
-        const phoneQuery = query(collection(db, "users"), where("phoneNumber", "==", cleanPhoneInput), limit(1));
-        const phoneSnap = await runWithRetry(() => getDocs(phoneQuery));
-
-        if (!phoneSnap.empty) {
-          targetUsername = phoneSnap.docs[0].data().username;
-        } else {
-          // 3. Try raw phone lookup as fallback
-          const rawPhoneQuery = query(collection(db, "users"), where("phoneNumber", "==", loginIdentifier.trim()), limit(1));
-          const rawPhoneSnap = await runWithRetry(() => getDocs(rawPhoneQuery));
-          
-          if (!rawPhoneSnap.empty) {
-            targetUsername = rawPhoneSnap.docs[0].data().username;
-          } else {
-            setErrorMessage("No account exists with this Username or Phone number.");
-            setLoadingAction(false);
-            return;
-          }
-        }
+        setErrorMessage("No account exists with this Username or Phone number.");
+        setLoadingAction(false);
+        return;
       }
 
       const email = `${targetUsername}@bububai.com`;

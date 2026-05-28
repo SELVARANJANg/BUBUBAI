@@ -1,6 +1,6 @@
 {
   "name": "BUBUBAI",
-  "description": "A blank, pure white page.",
+  "description": "Premium multi-agent conversational console with customizable biometric holographic identity badges and rapid user authentication.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

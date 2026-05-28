@@ -25,6 +25,14 @@
           "type": "string",
           "description": "Unique phone number"
         },
+        "avatar": {
+          "type": "string",
+          "description": "Custom high-contrast vector profile avatar URL or data URI"
+        },
+        "hasGeneratedAvatar": {
+          "type": "boolean",
+          "description": "Flag representing if the user has already consumed their single custom avatar generation slot"
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",

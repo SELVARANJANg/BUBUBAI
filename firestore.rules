@@ -20,24 +20,28 @@ service cloud.firestore {
     // Helper: Validates User Profile Entity structure on creation
     function isValidUser(user) {
       return user.keys().hasAll(['uid', 'name', 'nickname', 'username', 'phoneNumber', 'createdAt'])
-        && user.keys().size() == 6
+        && user.keys().size() >= 6 && user.keys().size() <= 8
         && user.uid == request.auth.uid
         && user.name is string && user.name.size() > 0 && user.name.size() <= 100
         && user.nickname is string && user.nickname.size() > 0 && user.nickname.size() <= 100
         && user.username is string && user.username.size() >= 3 && user.username.size() <= 30
         && user.phoneNumber is string && user.phoneNumber.size() >= 5 && user.phoneNumber.size() <= 20
-        && user.createdAt == request.time;
+        && user.createdAt == request.time
+        && (!('avatar' in user) || (user.avatar is string && user.avatar.size() <= 1000000))
+        && (!('hasGeneratedAvatar' in user) || user.hasGeneratedAvatar is bool);
     }
 
     // Helper: Validates User Profile Entity structure on update (allows immutable createdAt check)
     function isValidUserUpdate(user) {
       return user.keys().hasAll(['uid', 'name', 'nickname', 'username', 'phoneNumber', 'createdAt'])
-        && user.keys().size() == 6
+        && user.keys().size() >= 6 && user.keys().size() <= 8
         && user.uid == request.auth.uid
         && user.name is string && user.name.size() > 0 && user.name.size() <= 100
         && user.nickname is string && user.nickname.size() > 0 && user.nickname.size() <= 100
         && user.username is string && user.username.size() >= 3 && user.username.size() <= 30
-        && user.phoneNumber is string && user.phoneNumber.size() >= 5 && user.phoneNumber.size() <= 20;
+        && user.phoneNumber is string && user.phoneNumber.size() >= 5 && user.phoneNumber.size() <= 20
+        && (!('avatar' in user) || (user.avatar is string && user.avatar.size() <= 1000000))
+        && (!('hasGeneratedAvatar' in user) || user.hasGeneratedAvatar is bool);
     }
 
     // Helper: Validates Chat session structure
