@@ -1478,17 +1478,28 @@ async function setupVite() {
     app.use(vite.middlewares);
     console.log("Vite development middleware integrated.");
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-    console.log("Production serving from: ", distPath);
+    // On Vercel, the framework handles serving static files directly from the compiled "dist" folder.
+    // We only mount static folder serving for local production runs or Cloud Run containers.
+    if (!process.env.VERCEL) {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+      console.log("Production serving from: ", distPath);
+    }
   }
 }
 
-setupVite().then(() => {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server fully responsive on port http://0.0.0.0:${PORT}`);
+if (!process.env.VERCEL) {
+  setupVite().then(() => {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server fully responsive on port http://0.0.0.0:${PORT}`);
+    });
   });
-});
+} else {
+  // On Vercel serverless context in production, make sure middleware/routes are defined properly
+  setupVite();
+}
+
+export default app;
