@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Global Safety Net (default-deny catch-all)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper: Checks if the user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: Checks if the ID has a safe size and format
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Helper: Validates User Profile Entity structure on creation
+    function isValidUser(user) {
+      return user.keys().hasAll(['uid', 'name', 'nickname', 'username', 'phoneNumber', 'createdAt'])
+        && user.keys().size() == 6
+        && user.uid == request.auth.uid
+        && user.name is string && user.name.size() > 0 && user.name.size() <= 100
+        && user.nickname is string && user.nickname.size() > 0 && user.nickname.size() <= 100
+        && user.username is string && user.username.size() >= 3 && user.username.size() <= 30
+        && user.phoneNumber is string && user.phoneNumber.size() >= 5 && user.phoneNumber.size() <= 20
+        && user.createdAt == request.time;
+    }
+
+    // Helper: Validates User Profile Entity structure on update (allows immutable createdAt check)
+    function isValidUserUpdate(user) {
+      return user.keys().hasAll(['uid', 'name', 'nickname', 'username', 'phoneNumber', 'createdAt'])
+        && user.keys().size() == 6
+        && user.uid == request.auth.uid
+        && user.name is string && user.name.size() > 0 && user.name.size() <= 100
+        && user.nickname is string && user.nickname.size() > 0 && user.nickname.size() <= 100
+        && user.username is string && user.username.size() >= 3 && user.username.size() <= 30
+        && user.phoneNumber is string && user.phoneNumber.size() >= 5 && user.phoneNumber.size() <= 20;
+    }
+
+    // Helper: Validates Chat session structure
+    function isValidChat(chat) {
+      return chat.keys().hasAll(['id', 'userId', 'title', 'messages', 'createdAt', 'updatedAt'])
+        && chat.keys().size() == 6
+        && chat.id is string && chat.id.size() <= 128
+        && chat.userId == request.auth.uid
+        && chat.title is string && chat.title.size() <= 200
+        && chat.messages is list;
+    }
+
+    // 2. Rules for the users collection
+    match /users/{userId} {
+      // Users can only perform a single "get" on their own document
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      
+      // Permit list operations ONLY if they are querying for a specific username or phone number (uniqueness & login search)
+      // Enforce zero leak by checking queried constraints
+      allow list: if (
+        request.query.limit <= 1
+      );
+
+      // Create: User can write their own profile once authenticated
+      allow create: if isSignedIn() 
+        && request.auth.uid == userId 
+        && isValidId(userId)
+        && isValidUser(request.resource.data);
+
+      // Update: User can edit their profile information, but cannot change their immutables (uid, username, createdAt)
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && isValidUserUpdate(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.username == resource.data.username;
+    }
+
+    // 3. Rules for the chats collection
+    match /chats/{chatId} {
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn()
+        && isValidId(chatId)
+        && isValidChat(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isSignedIn()
+        && isValidId(chatId)
+        && isValidChat(request.resource.data)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+  }
+}

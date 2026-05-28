@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information stored when a user signs up for BUBUBAI ID",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full legal or preferred name"
+        },
+        "nickname": {
+          "type": "string",
+          "description": "Nickname used across the theme"
+        },
+        "username": {
+          "type": "string",
+          "description": "Unique custom username"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "Unique phone number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when this user record was registered"
+        }
+      },
+      "required": ["uid", "name", "nickname", "username", "phoneNumber", "createdAt"]
+    },
+    "Chat": {
+      "title": "Chat Session",
+      "description": "Ongoing conversation history for BuBuBai assistant",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Chat auto-save session unique ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owning user"
+        },
+        "title": {
+          "type": "string",
+          "description": "The friendly generated title based on first query"
+        },
+        "messages": {
+          "type": "array",
+          "description": "Array of messages containing role, content, and timestamp keys"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the chat was started"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the chat was last active"
+        }
+      },
+      "required": ["id", "userId", "title", "messages", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Secure master registry for Bububai authenticated users"
+    },
+    "chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Secure list of code generation and text chats for users, auto-cleaned after 24 hours"
+    }
+  }
+}
