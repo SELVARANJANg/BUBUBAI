@@ -188,7 +188,9 @@ function isApiKeyInvalid(key: string | undefined): boolean {
     k.startsWith("YOUR_") ||
     k === "undefined" ||
     k === "MY_BUBUBAI_API_KEY" ||
-    k === "your_bububai_api_key_here"
+    k === "your_bububai_api_key_here" ||
+    k === "MY_GAMURA_API_KEY" ||
+    k === "your_gamura_api_key_here"
   );
 }
 
@@ -199,12 +201,16 @@ function getAvailableKeys(): { key: string; label: string }[] {
   const list: { key: string; label: string }[] = [];
   const primary = process.env.GEMINI_API_KEY;
   const secondary = process.env.BUBUBAI_API_KEY;
+  const tertiary = process.env.GAMURA_API_KEY;
   
   if (!isApiKeyInvalid(primary)) {
     list.push({ key: primary!.trim(), label: "GEMINI_API_KEY" });
   }
   if (!isApiKeyInvalid(secondary)) {
     list.push({ key: secondary!.trim(), label: "BUBUBAI_API_KEY" });
+  }
+  if (!isApiKeyInvalid(tertiary)) {
+    list.push({ key: tertiary!.trim(), label: "GAMURA_API_KEY" });
   }
   return list;
 }

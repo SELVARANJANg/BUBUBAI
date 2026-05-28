@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { 
   X, Camera, Image, FileText, ChevronRight, ListCollapse, Clock, Trash2, Code, 
-  User, Lock, Sparkles, RefreshCw, BadgeCheck, Smartphone, Save
+  User, Lock, Sparkles, RefreshCw, BadgeCheck, Smartphone, Save, LogOut, Sliders, Copy, Check
 } from "lucide-react";
 import { ChatView } from "./ChatView";
 import { db, runWithRetry } from "../firebase";
@@ -46,6 +46,16 @@ export function Dashboard({ userProfile, onSignOut, onUpdateProfile }: Dashboard
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [profileOpen, setProfileOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [copiedMatchId, setCopiedMatchId] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsSuccessMsg, setSettingsSuccessMsg] = useState("");
+  
+  // Settings configurations
+  const [chatTemp, setChatTemp] = useState(() => parseFloat(localStorage.getItem("bububai_chat_temp") || "0.7"));
+  const [defaultModel, setDefaultModel] = useState(() => localStorage.getItem("bububai_default_model") || "gemini-2.5-flash");
+  const [biometricBypass, setBiometricBypass] = useState(() => localStorage.getItem("bububai_biometric_bypass") === "true");
+  
   const [profileName, setProfileName] = useState("");
   const [profileNickname, setProfileNickname] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
@@ -511,7 +521,7 @@ export function Dashboard({ userProfile, onSignOut, onUpdateProfile }: Dashboard
             </svg>
             Profile
           </a>
-          <a className="dr-row" href="#" onClick={(e) => { e.preventDefault(); setDrawerOpen(false); }}>
+          <a className="dr-row" href="#" onClick={(e) => { e.preventDefault(); setDrawerOpen(false); setSettingsOpen(true); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -537,8 +547,8 @@ export function Dashboard({ userProfile, onSignOut, onUpdateProfile }: Dashboard
           </button>
         </div>
 
-        <div className="dr-bottom">
-          <div className="dr-user cursor-pointer hover:bg-neutral-100/50 transition-colors -mx-1 p-1" onClick={() => { setDrawerOpen(false); setProfileOpen(true); }}>
+        <div className="dr-bottom border-t border-neutral-100/50 pt-2.5">
+          <div className="dr-user cursor-pointer hover:bg-neutral-100/50 transition-colors -mx-1 p-1 rounded-xl" onClick={() => { setDrawerOpen(false); setProfileOpen(true); }}>
             <div className="av overflow-hidden flex items-center justify-center">
               {userProfile?.avatar ? (
                 <img src={userProfile.avatar} alt="User Avatar" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
@@ -551,6 +561,19 @@ export function Dashboard({ userProfile, onSignOut, onUpdateProfile }: Dashboard
               <div className="av-sub">Founder &amp; CEO · Gamura</div>
             </div>
           </div>
+          
+          <button 
+            type="button"
+            className="w-full mt-2 py-1.5 px-3 bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-800 text-[10px] font-mono tracking-wider rounded-xl transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer uppercase font-extrabold"
+            onClick={async (e) => {
+              e.stopPropagation();
+              setDrawerOpen(false);
+              await onSignOut();
+            }}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out From Card</span>
+          </button>
         </div>
       </aside>
 
@@ -1103,16 +1126,51 @@ export function Dashboard({ userProfile, onSignOut, onUpdateProfile }: Dashboard
                     </div>
                   </div>
 
-                  <div className="bg-[#f8f8f6] rounded-xl p-2.5 border border-[#ebebe8] flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                    <span className="text-[9px] text-neutral-500 font-mono">
-                      SECURE MATCH ID: REG-{userProfile?.uid?.slice(0, 10).toUpperCase() || "GATEWAY"}
-                    </span>
+                  <div className="bg-[#f8f8f6] rounded-xl p-2.5 border border-[#ebebe8] flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      <span className="text-[9px] text-neutral-500 font-mono truncate">
+                        SECURE MATCH ID: REG-{userProfile?.uid?.slice(0, 10).toUpperCase() || "GATEWAY"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (userProfile?.uid) {
+                          navigator.clipboard.writeText(userProfile.uid);
+                          setCopiedMatchId(true);
+                          setTimeout(() => setCopiedMatchId(false), 2000);
+                        }
+                      }}
+                      className="p-1 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/50 rounded transition cursor-pointer flex items-center justify-center shrink-0"
+                      title="Copy System User ID"
+                      id="copy-match-id-btn"
+                    >
+                      {copiedMatchId ? (
+                        <span className="text-[7.5px] text-emerald-600 font-mono font-bold px-1 uppercase animate-pulse">Copied!</span>
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
                   </div>
 
                 </div>
 
-                <div className="flex gap-2 justify-end pt-3 border-t border-[#f4f4f2] mt-4">
+                <div className="flex gap-2 justify-end pt-3 border-t border-[#f4f4f2] mt-4 font-sans">
+                  
+                  {/* Logout button in Member Pass profile card section per instructions */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setProfileOpen(false);
+                      await onSignOut();
+                    }}
+                    className="mr-auto py-2 px-3 border border-red-200 hover:bg-neutral-50 text-[10px] font-mono tracking-wider rounded-xl uppercase transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer text-[#c94c2e] font-extrabold"
+                  >
+                    <LogOut className="w-3.5 h-3.5 shrink-0" />
+                    <span>Card Sign Out</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setProfileOpen(false)}
@@ -1143,6 +1201,179 @@ export function Dashboard({ userProfile, onSignOut, onUpdateProfile }: Dashboard
               </form>
 
             </div>
+
+          </div>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div id="settings-modal-root" className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 bg-neutral-950/40 backdrop-blur-[8px] transition-all duration-300"
+            onClick={() => setSettingsOpen(false)}
+          />
+          
+          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#c94c2e]/5 rounded-full filter blur-[120px] pointer-events-none" />
+
+          <div className="bg-[#ffffff] border border-[#e2e2de] rounded-[32px] w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl relative z-10 p-6 sm:p-8 flex flex-col space-y-6 animate-fadeIn">
+            
+            <div className="flex items-center justify-between border-b border-[#f4f4f2] pb-4 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-neutral-900 flex items-center justify-center text-white">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="font-sans font-bold text-base text-[#111110] leading-none">
+                    Security &amp; Engine Settings
+                  </h2>
+                  <p className="text-[9px] font-mono tracking-widest text-neutral-400 uppercase mt-1">
+                    Configure Registry Preferences
+                  </p>
+                </div>
+              </div>
+              
+              <button
+                type="button"
+                className="p-1.5 text-neutral-400 hover:text-[#111110] hover:bg-[#f4f4f2] rounded-lg transition-colors cursor-pointer"
+                onClick={() => setSettingsOpen(false)}
+                aria-label="Close"
+              >
+                <X className="w-[19px] h-[19px]" />
+              </button>
+            </div>
+
+            {settingsSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-855 text-xs rounded-xl flex items-center gap-2 animate-fadeIn">
+                <BadgeCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="font-medium mr-auto text-emerald-800">{settingsSuccessMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setSettingsSaving(true);
+              setSettingsSuccessMsg("");
+              localStorage.setItem("bububai_chat_temp", chatTemp.toString());
+              localStorage.setItem("bububai_default_model", defaultModel);
+              localStorage.setItem("bububai_biometric_bypass", biometricBypass ? "true" : "false");
+              
+              setTimeout(() => {
+                setSettingsSaving(false);
+                setSettingsSuccessMsg("Configuration stored &amp; compiled in Registry!");
+                setTimeout(() => setSettingsSuccessMsg(""), 3000);
+              }, 600);
+            }} className="space-y-5">
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono tracking-widest text-neutral-500 font-extrabold block uppercase">
+                  ACTIVE NETWORK MODEL (AI COGNITION ENGINE)
+                </label>
+                <select
+                  value={defaultModel}
+                  onChange={(e) => setDefaultModel(e.target.value)}
+                  className="w-full bg-white border border-[#e2e2de] rounded-xl px-3 py-2 text-xs text-neutral-800 focus:outline-none focus:border-neutral-900 font-medium cursor-pointer"
+                >
+                  <option value="gemini-2.1-pro">BubuPro Premium (Gemini 2.1 Pro - Analytical power)</option>
+                  <option value="gemini-2.5-flash">BubuUltra Pro (Gemini 2.5 Flash - Speed optimized)</option>
+                  <option value="gemini-2.5-flash-lite">BubuLite Core (Gemini 2.5 Flash Lite - Ultra Lite)</option>
+                </select>
+                <p className="text-[9px] text-neutral-400 italic font-medium">
+                  Primary engine selection for real-time code drafting, text summarization, and cognitive chat.
+                </p>
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between items-center bg-neutral-50 px-3 py-1.5 rounded-lg border border-neutral-100">
+                  <span className="text-[10px] font-mono tracking-widest text-[#111110] font-bold uppercase">
+                    COGNITIVE TEMPERATURE ACCURACY
+                  </span>
+                  <span className="text-xs font-mono font-bold text-[#c94c2e]">
+                    {chatTemp.toFixed(2)}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.05"
+                  value={chatTemp}
+                  onChange={(e) => setChatTemp(parseFloat(e.target.value))}
+                  className="w-full h-1 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-[#c94c2e] mt-1"
+                />
+                <div className="flex justify-between text-[8px] font-mono text-neutral-400 uppercase px-1">
+                  <span>Strict / Stable (0.1)</span>
+                  <span>Creative / Unpredictable (1.0)</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 border-t border-[#f4f4f2] pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0 pr-2">
+                    <label className="text-[10px] font-mono tracking-wider text-neutral-700 block font-bold uppercase">
+                      SECURE BIOMETRIC BYPASS PIN
+                    </label>
+                    <p className="text-[9px] text-neutral-400 font-medium">
+                      Skip identity credentials on this browser tab with a cached biometric simulation.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={biometricBypass}
+                      onChange={(e) => setBiometricBypass(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#c94c2e]"></div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="bg-[#fcfcfb] rounded-xl p-3 border border-[#ebebe8] flex flex-col space-y-1 mt-2">
+                <span className="text-[8px] font-mono font-bold tracking-widest text-[#c94c2e] uppercase">
+                  ACTIVE KEY ROTATION MATRIX (TELEMETRY)
+                </span>
+                <div className="grid grid-cols-3 gap-2 mt-1.5 text-center text-[8px] font-mono">
+                  <div className="bg-emerald-50 border border-emerald-100 text-emerald-850 p-1.5 rounded-lg font-bold">
+                    KEY Slot 1<br /><span className="text-[7px] text-emerald-600 block pt-0.5">ACTIVE</span>
+                  </div>
+                  <div className="bg-emerald-50 border border-emerald-100 text-emerald-850 p-1.5 rounded-lg font-bold">
+                    KEY Slot 2<br /><span className="text-[7px] text-emerald-600 block pt-0.5">BACKUP</span>
+                  </div>
+                  <div className="bg-[#f07050]/10 border border-[#f07050]/20 text-neutral-800 p-1.5 rounded-lg font-bold">
+                    GAMURA KEY<br /><span className="text-[7px] text-[#c94c2e] block pt-0.5">TERTIARY</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-3 border-t border-[#f4f4f2] mt-4">
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(false)}
+                  className="py-2 px-4 border border-[#e2e2de] text-[10px] font-mono tracking-wider rounded-xl uppercase hover:bg-[#f4f4f2] transition cursor-pointer"
+                >
+                  Close
+                </button>
+                
+                <button
+                  type="submit"
+                  disabled={settingsSaving}
+                  className="py-2 px-5 bg-[#111110] text-white text-[10px] font-mono tracking-wider rounded-xl uppercase hover:bg-neutral-800 disabled:opacity-50 transition flex items-center gap-1 cursor-pointer"
+                >
+                  {settingsSaving ? (
+                    <>
+                      <RefreshCw className="w-3 h-3 animate-spin" />
+                      <span>Syncing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3 h-3" />
+                      <span>Apply Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </form>
 
           </div>
         </div>

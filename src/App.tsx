@@ -74,6 +74,7 @@ export default function App() {
 
   // Profile Modification Settings
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [copiedUid, setCopiedUid] = useState(false);
   const [editName, setEditName] = useState("");
   const [editNickname, setEditNickname] = useState("");
 
@@ -699,8 +700,19 @@ export default function App() {
                               {userProfile.nickname}
                             </h3>
                           </div>
-                          <div className="p-2.5 bg-white/5 border border-white/10 rounded-2xl">
-                            <Sparkles className="w-5 h-5 text-amber-400" />
+                          <div className="w-12 h-12 rounded-full border border-white/15 bg-white/5 p-0.5 shadow-md flex items-center justify-center overflow-hidden shrink-0">
+                            {userProfile.avatar ? (
+                              <img 
+                                src={userProfile.avatar} 
+                                alt="Registry Avatar" 
+                                className="w-full h-full object-cover rounded-full"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <span className="text-sm font-bold font-sans text-neutral-200">
+                                {((userProfile.nickname || userProfile.name || "SG").trim().split(/\s+/).map((p: any) => p[0]).join("")).toUpperCase().slice(0, 2)}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -764,7 +776,31 @@ export default function App() {
                               </div>
                               <div>
                                 <p className="text-[9px] font-mono text-neutral-400 tracking-wider">SECURE CODE</p>
-                                <p className="text-xs sm:text-sm font-mono text-emerald-400 font-black tracking-widest">BBB-{currentAuthUser.uid.slice(0, 6).toUpperCase()}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-xs sm:text-sm font-mono text-emerald-400 font-black tracking-widest">
+                                    BBB-{currentAuthUser.uid.slice(0, 6).toUpperCase()}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(currentAuthUser.uid);
+                                      setCopiedUid(true);
+                                      setTimeout(() => setCopiedUid(false), 2000);
+                                    }}
+                                    className="p-1 text-neutral-400 hover:text-white hover:bg-white/10 rounded transition cursor-pointer flex items-center justify-center shrink-0"
+                                    title="Copy Unique User ID"
+                                    id="copy-id-btn"
+                                  >
+                                    {copiedUid ? (
+                                      <span className="text-[7px] text-emerald-400 font-mono font-bold px-1 uppercase animate-pulse">Copied!</span>
+                                    ) : (
+                                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
