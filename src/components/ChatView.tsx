@@ -122,6 +122,7 @@ export function ChatView({
     );
   });
   const isNewSessionRef = useRef<boolean>(!activeChatId);
+  const hasLoadedRef = useRef<string | null>(null);
   const [chatSummary, setChatSummary] = useState<string>("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -218,6 +219,7 @@ export function ChatView({
 
   const loadExistingChat = async (chatId: string) => {
     setIsLoading(true);
+    setChatSummary(""); // Reset the header summary for the newly selected chat session immediately
     try {
       const docSnap = await runWithRetry(() =>
         getDoc(doc(db, "chats", chatId)),
@@ -229,7 +231,7 @@ export function ChatView({
             id: m.id,
             role: m.role,
             content: m.content,
-            timestamp: new Date(m.timestamp),
+            timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
           }),
         );
         setMessages(loadedMessages);
@@ -243,10 +245,16 @@ export function ChatView({
 
   // Initialize with user's initial prompt or load from history
   useEffect(() => {
-    if (activeChatId && activeChatId !== currentChatId) {
-      setCurrentChatId(activeChatId);
-      loadExistingChat(activeChatId);
-    } else if (!activeChatId) {
+    if (activeChatId) {
+      // Ensure we load the chat if activeChatId doesn't match current state, 
+      // or if it's the first mount and needs to fetch (hasLoadedRef protects against skipped mount runs)
+      if (activeChatId !== currentChatId || (hasLoadedRef.current !== activeChatId && !isNewSessionRef.current)) {
+        hasLoadedRef.current = activeChatId;
+        setCurrentChatId(activeChatId);
+        isNewSessionRef.current = false;
+        loadExistingChat(activeChatId);
+      }
+    } else {
       if (initialPrompt && initialPrompt.trim()) {
         const generatedId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         setCurrentChatId(generatedId);

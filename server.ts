@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -388,9 +387,13 @@ const getSystemInstructionForMethod = (method: string, currentMood: string, isFi
 let lastApiKey: string | undefined = undefined;
 let aiClient: GoogleGenAI | null = null;
 
+function cleanApiKey(key: string | undefined): string {
+  if (!key) return "";
+  return key.trim().replace(/^['"]|['"]$/g, '');
+}
+
 function isApiKeyInvalid(key: string | undefined): boolean {
-  if (!key) return true;
-  const k = key.trim();
+  const k = cleanApiKey(key);
   return (
     k === "" || 
     k === "dummy-key" || 
@@ -411,18 +414,18 @@ const keyStates = new Map<string, { isBlacklisted: boolean; blacklistUntil: numb
 
 function getAvailableKeys(): { key: string; label: string }[] {
   const list: { key: string; label: string }[] = [];
-  const primary = process.env.GEMINI_API_KEY;
-  const secondary = process.env.BUBUBAI_API_KEY;
-  const tertiary = process.env.GAMURA_API_KEY;
+  const primary = cleanApiKey(process.env.GEMINI_API_KEY);
+  const secondary = cleanApiKey(process.env.BUBUBAI_API_KEY);
+  const tertiary = cleanApiKey(process.env.GAMURA_API_KEY);
   
   if (!isApiKeyInvalid(primary)) {
-    list.push({ key: primary!.trim(), label: "GEMINI_API_KEY" });
+    list.push({ key: primary, label: "GEMINI_API_KEY" });
   }
   if (!isApiKeyInvalid(secondary)) {
-    list.push({ key: secondary!.trim(), label: "BUBUBAI_API_KEY" });
+    list.push({ key: secondary, label: "BUBUBAI_API_KEY" });
   }
   if (!isApiKeyInvalid(tertiary)) {
-    list.push({ key: tertiary!.trim(), label: "GAMURA_API_KEY" });
+    list.push({ key: tertiary, label: "GAMURA_API_KEY" });
   }
   return list;
 }
@@ -820,22 +823,28 @@ export const localSandboxResult = {
     }
 
     // Robust model waterfall sequence priorities based on activeMethod
+    // Includes stable gemini-2.5 standard fallbacks to ensure working service across all key tiers
     let modelsToTry: string[] = [];
     if (activeMethod === "pro") {
       modelsToTry = [
         "gemini-3.1-pro-preview",
-        "gemini-3.5-flash"
+        "gemini-2.5-pro",
+        "gemini-3.5-flash",
+        "gemini-2.5-flash"
       ];
     } else if (activeMethod === "lite") {
       modelsToTry = [
         "gemini-3.1-flash-lite",
-        "gemini-3.5-flash"
+        "gemini-3.5-flash",
+        "gemini-2.5-flash"
       ];
     } else {
       // Default (ultra)
       modelsToTry = [
         "gemini-3.5-flash",
-        "gemini-3.1-pro-preview"
+        "gemini-2.5-flash",
+        "gemini-3.1-pro-preview",
+        "gemini-2.5-pro"
       ];
     }
 
@@ -1446,6 +1455,7 @@ app.post("/api/bububai/tts", async (req, res) => {
 // Mount Vite middleware in development mode
 async function setupVite() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

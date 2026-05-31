@@ -591,7 +591,9 @@ export function Dashboard({
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              handleChipClick("");
+              setActiveChatId(null);
+              setActiveChatPrompt(null);
+              setTextValue("");
               setDrawerOpen(false);
             }}
           >
@@ -1007,7 +1009,9 @@ export function Dashboard({
               <div className="absolute right-0 top-[calc(100%+8px)] w-40 z-50 bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-neutral-100 py-1 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                 <button
                   onClick={() => {
-                    handleChipClick("");
+                    setActiveChatId(null);
+                    setActiveChatPrompt(null);
+                    setTextValue("");
                     setPlusMenuOpen(false);
                   }}
                   className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 transition-colors flex items-center gap-2.5"
