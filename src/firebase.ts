@@ -91,6 +91,11 @@ export async function runWithRetry<T>(
         error?.code === "unavailable"
       );
       if (attempt >= maxRetries || !isRateOrQuota) {
+        if (!navigator.onLine) {
+          // If offline, native persistent cache will sync automatically reconnect
+          console.log("[Retry Engine] Device offline, relying on Firestore Local Cache offline queue...");
+          return undefined as any; // Allow silent background queuing
+        }
         throw error;
       }
       const sleepTime = delayMs * Math.pow(factor, attempt - 1);

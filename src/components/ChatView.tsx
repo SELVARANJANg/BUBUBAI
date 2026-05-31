@@ -1,18 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
-import { 
-  X, 
-  ArrowLeft, 
-  Copy, 
-  Check, 
-  Share2, 
-  Play, 
-  Square, 
-  ThumbsUp, 
-  ThumbsDown, 
-  RotateCcw, 
-  Plus, 
-  Mic, 
-  Send, 
+import { motion, AnimatePresence } from "motion/react";
+import {
+  X,
+  ArrowLeft,
+  Copy,
+  Check,
+  Share2,
+  Play,
+  Square,
+  ThumbsUp,
+  ThumbsDown,
+  RotateCcw,
+  Plus,
+  Mic,
+  Send,
   Sparkles,
   Volume2,
   FileCode,
@@ -20,17 +21,17 @@ import {
   Download,
   Sun,
   Moon,
-  GitCompare
+  GitCompare,
 } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
 import { db, auth, runWithRetry } from "../firebase";
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  serverTimestamp 
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 
 export interface ChatMessage {
@@ -46,7 +47,10 @@ export interface ChatMessage {
  * Utility to prune chat history to fit inside a sliding context window
  * It estimates tokens (1 token ≈ 4 characters) and retains the most recent messages.
  */
-export function trimHistoryToContextWindow(messages: { role: string; content: string }[], maxTokens: number = 6000): { role: string; content: string }[] {
+export function trimHistoryToContextWindow(
+  messages: { role: string; content: string }[],
+  maxTokens: number = 6000,
+): { role: string; content: string }[] {
   let estimatedTotalTokens = 0;
   const pruned: { role: string; content: string }[] = [];
 
@@ -60,7 +64,7 @@ export function trimHistoryToContextWindow(messages: { role: string; content: st
     estimatedTotalTokens += msgTokens;
     pruned.unshift(msg); // Add to the beginning of pruned array
   }
-  
+
   // Ensure we don't start with a 'model' request as the Gemini API expects a user role first
   while (pruned.length > 0 && pruned[0].role === "model") {
     pruned.shift();
@@ -72,6 +76,7 @@ export function trimHistoryToContextWindow(messages: { role: string; content: st
 interface ChatViewProps {
   initialPrompt: string | null;
   activeChatId: string | null;
+  onChangeChatId?: (id: string | null) => void;
   userProfile: {
     uid?: string;
     name?: string;
@@ -79,10 +84,17 @@ interface ChatViewProps {
     username?: string;
   } | null;
   onBack: () => void;
-  onOpenBottomSheet: () => void;
+  onOpenBottomSheet: (appendFn: (text: string) => void) => void;
 }
 
-export function ChatView({ initialPrompt, activeChatId, userProfile, onBack, onOpenBottomSheet }: ChatViewProps) {
+export function ChatView({
+  initialPrompt,
+  activeChatId,
+  onChangeChatId,
+  userProfile,
+  onBack,
+  onOpenBottomSheet,
+}: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -90,14 +102,24 @@ export function ChatView({ initialPrompt, activeChatId, userProfile, onBack, onO
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [copyCodeSuccess, setCopyCodeSuccess] = useState<string | null>(null); // maps to block id or index
   const [isDarkSyntax, setIsDarkSyntax] = useState<boolean>(true);
-  
+
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
-  const [selectedMethod, setSelectedMethod] = useState<string>("ultra");
+  const [showPopupMenu, setShowPopupMenu] = useState<boolean>(false);
+  const [selectedMethod, setSelectedMethod] = useState<string>(() => {
+    const stored = localStorage.getItem("bububai_default_model");
+    if (stored === "gemini-2.1-pro") return "pro";
+    if (stored === "gemini-2.5-flash-lite") return "lite";
+    if (stored === "gemini-2.5-flash") return "ultra";
+    return "ultra";
+  });
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>({});
 
   const [currentChatId, setCurrentChatId] = useState<string>(() => {
-    return activeChatId || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    return (
+      activeChatId ||
+      `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    );
   });
   const isNewSessionRef = useRef<boolean>(!activeChatId);
   const [chatSummary, setChatSummary] = useState<string>("");
@@ -117,7 +139,7 @@ export function ChatView({ initialPrompt, activeChatId, userProfile, onBack, onO
           const res = await fetch("/api/bububai/summarize", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages })
+            body: JSON.stringify({ messages }),
           });
           const data = await res.json();
           if (data.summary) {
@@ -127,54 +149,67 @@ export function ChatView({ initialPrompt, activeChatId, userProfile, onBack, onO
           console.warn("Could not generate header focus context:", e);
         }
       };
-      
+
       const debounceTimer = setTimeout(() => {
         getSummary();
       }, 1500); // larger debounce to capture full exchange
-      
+
       return () => clearTimeout(debounceTimer);
     }
   }, [messages, isLoading, chatSummary]);
 
   // Helper inside ChatView to trigger Firestore auto-saving
-  const saveChatSession = async (updatedMsgs: ChatMessage[]) => {
+  const saveChatSession = async (
+    updatedMsgs: ChatMessage[],
+    targetChatId?: string,
+  ) => {
     const uid = userProfile?.uid || auth?.currentUser?.uid;
     if (!uid) return;
 
-    const firstUserMsg = updatedMsgs.find(m => m.role === "user");
-    const docTitle = firstUserMsg 
-      ? (firstUserMsg.content.slice(0, 40) + (firstUserMsg.content.length > 40 ? "..." : ""))
+    const firstUserMsg = updatedMsgs.find((m) => m.role === "user");
+    const docTitle = firstUserMsg
+      ? firstUserMsg.content.slice(0, 40) +
+        (firstUserMsg.content.length > 40 ? "..." : "")
       : "BUBUBAI Code Chat";
 
-    const safeMessages = updatedMsgs.map(m => ({
+    const safeMessages = updatedMsgs.map((m) => ({
       id: m.id,
       role: m.role,
       content: m.content,
-      timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : (m.timestamp as any).toString()
+      timestamp:
+        m.timestamp instanceof Date
+          ? m.timestamp.toISOString()
+          : (m.timestamp as any).toString(),
     }));
 
+    const activeId = targetChatId || currentChatId;
+
     try {
-      const chatDocRef = doc(db, "chats", currentChatId);
-      
+      const chatDocRef = doc(db, "chats", activeId);
+
       const chatData = {
-        id: currentChatId,
+        id: activeId,
         userId: uid,
         title: docTitle,
         messages: safeMessages,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       };
 
       if (isNewSessionRef.current) {
-        await runWithRetry(() => setDoc(chatDocRef, {
-          ...chatData,
-          createdAt: serverTimestamp()
-        }));
+        await runWithRetry(() =>
+          setDoc(chatDocRef, {
+            ...chatData,
+            createdAt: serverTimestamp(),
+          }),
+        );
         isNewSessionRef.current = false;
       } else {
-        await runWithRetry(() => updateDoc(chatDocRef, {
-          messages: safeMessages,
-          updatedAt: serverTimestamp()
-        }));
+        await runWithRetry(() =>
+          updateDoc(chatDocRef, {
+            messages: safeMessages,
+            updatedAt: serverTimestamp(),
+          }),
+        );
       }
     } catch (saveErr) {
       console.warn("Failed to auto-save chat session to database:", saveErr);
@@ -184,15 +219,19 @@ export function ChatView({ initialPrompt, activeChatId, userProfile, onBack, onO
   const loadExistingChat = async (chatId: string) => {
     setIsLoading(true);
     try {
-      const docSnap = await runWithRetry(() => getDoc(doc(db, "chats", chatId)));
+      const docSnap = await runWithRetry(() =>
+        getDoc(doc(db, "chats", chatId)),
+      );
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const loadedMessages: ChatMessage[] = (data.messages || []).map((m: any) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          timestamp: new Date(m.timestamp)
-        }));
+        const loadedMessages: ChatMessage[] = (data.messages || []).map(
+          (m: any) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: new Date(m.timestamp),
+          }),
+        );
         setMessages(loadedMessages);
       }
     } catch (err) {
@@ -204,19 +243,31 @@ export function ChatView({ initialPrompt, activeChatId, userProfile, onBack, onO
 
   // Initialize with user's initial prompt or load from history
   useEffect(() => {
-    if (activeChatId) {
+    if (activeChatId && activeChatId !== currentChatId) {
+      setCurrentChatId(activeChatId);
       loadExistingChat(activeChatId);
-    } else if (initialPrompt && initialPrompt.trim()) {
-      handleNewConversation(initialPrompt);
-    } else {
-      // Create a personalized warm welcome from BuBuBai for blank sessions matching STRICT FIRST MESSAGE RULE!
-      const welcomeMsg: ChatMessage = {
-        id: `m-welcome-${Date.now()}`,
-        role: "model",
-        content: `Hey ${displayName}! 👋 I'm BuBuBai, your elite AI assistant. Whether you need killer code, answers, or creative help — I've got you. What are we building today?`,
-        timestamp: new Date()
-      };
-      setMessages([welcomeMsg]);
+    } else if (!activeChatId) {
+      if (initialPrompt && initialPrompt.trim()) {
+        const generatedId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        setCurrentChatId(generatedId);
+        isNewSessionRef.current = true;
+        if (onChangeChatId) onChangeChatId(generatedId);
+        handleNewConversation(initialPrompt, generatedId);
+      } else {
+        const generatedId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        setCurrentChatId(generatedId);
+        isNewSessionRef.current = true;
+        if (onChangeChatId) onChangeChatId(generatedId);
+
+        // Create a personalized warm welcome from BuBuBai matching strict rules!
+        const welcomeMsg: ChatMessage = {
+          id: `m-welcome-${Date.now()}`,
+          role: "model",
+          content: `Hey ${displayName}! 👋 I'm BuBuBai — your elite AI for code,\ncreativity, and everything in between.\nWhat are we working on today?`,
+          timestamp: new Date(),
+        };
+        setMessages([welcomeMsg]);
+      }
     }
   }, [activeChatId, initialPrompt]);
 
@@ -225,63 +276,62 @@ export function ChatView({ initialPrompt, activeChatId, userProfile, onBack, onO
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const handleNewConversation = async (promptText: string) => {
+  const handleNewConversation = async (
+    promptText: string,
+    targetChatId?: string,
+  ) => {
     const userMsg: ChatMessage = {
       id: `m-user-${Date.now()}`,
       role: "user",
       content: promptText,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
-    
+
     const freshMessages = [userMsg];
     setMessages(freshMessages);
     setIsLoading(true);
-    saveChatSession(freshMessages);
+    saveChatSession(freshMessages, targetChatId);
 
     try {
       const response = await fetch("/api/bububai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: promptText, history: [], method: selectedMethod })
+        body: JSON.stringify({
+          message: promptText,
+          history: [],
+          method: selectedMethod,
+          temperature: localStorage.getItem("bububai_chat_temp")
+            ? parseFloat(localStorage.getItem("bububai_chat_temp")!)
+            : undefined,
+        }),
       });
 
       const data = await response.json();
-      
+
       const replyMsg: ChatMessage = {
         id: `m-model-${Date.now()}`,
         role: "model",
         content: data.text || "Error getting reply from BuBuBai.",
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       const finalMessages = [...freshMessages, replyMsg];
       setMessages(finalMessages);
-      saveChatSession(finalMessages);
+      saveChatSession(finalMessages, targetChatId);
     } catch (error) {
       console.error("Error communicating with BubuBai:", error);
-      // Fallback offline simulated response to ensure the user gets value immediately
       const offlineMsg: ChatMessage = {
         id: `m-model-fallback-${Date.now()}`,
         role: "model",
-        content: `🔍 WHAT I BUILT — Offline backup generated by BuBuBai ULTRA
+        content: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ BuBuBai — Server Busy
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Our servers are currently at peak load.
+Please try again in a few moments. 🔄
 
-💻 CODE
-\`\`\`python
-# Offline backup generated by BuBuBai ULTRA
-def generate_code(prompt):
-    print(f"BubuBai completed request in safe offline mode: {prompt}")
-    return "⚡ Ready"
-
-generate_code("${promptText.replace(/"/g, '\\"')}")
-\`\`\`
-
-📌 KEY NOTES
-• Run offline using local \`python\` installation without internet requirements.
-• Edit the parameter string inside \`generate_code\` to test custom workflows offline.
-• Securely connects to the live API once internet handshake or secrets are re-established.
-
-⚡ Built by BuBuBai ULTRA — Powered by Gamura × Selvaranjan G`,
-        timestamp: new Date()
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        timestamp: new Date(),
       };
       const finalFallback = [...freshMessages, offlineMsg];
       setMessages(finalFallback);
@@ -295,7 +345,7 @@ generate_code("${promptText.replace(/"/g, '\\"')}")
     if (!inputValue.trim() || isLoading) return;
     const userPrompt = inputValue;
     setInputValue("");
-    
+
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -304,7 +354,7 @@ generate_code("${promptText.replace(/"/g, '\\"')}")
       id: `m-user-${Date.now()}`,
       role: "user",
       content: userPrompt,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     const updatedMessages = [...messages, newUserMsg];
@@ -314,27 +364,34 @@ generate_code("${promptText.replace(/"/g, '\\"')}")
 
     // Map conversation log for model memory context and prune for context window efficiency
     const historyPayload = trimHistoryToContextWindow(
-      messages.map(m => ({
+      messages.map((m) => ({
         role: m.role,
-        content: m.content
+        content: m.content,
       })),
-      6000
+      6000,
     );
 
     try {
       const response = await fetch("/api/bububai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userPrompt, history: historyPayload, method: selectedMethod })
+        body: JSON.stringify({
+          message: userPrompt,
+          history: historyPayload,
+          method: selectedMethod,
+          temperature: localStorage.getItem("bububai_chat_temp")
+            ? parseFloat(localStorage.getItem("bububai_chat_temp")!)
+            : undefined,
+        }),
       });
 
       const data = await response.json();
-      
+
       const replyMsg: ChatMessage = {
         id: `m-model-${Date.now()}`,
         role: "model",
         content: data.text || "No reply was returned.",
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       const finalMessages = [...updatedMessages, replyMsg];
@@ -345,21 +402,15 @@ generate_code("${promptText.replace(/"/g, '\\"')}")
       const fallbackReply: ChatMessage = {
         id: `m-model-fallback-${Date.now()}`,
         role: "model",
-        content: `🔍 WHAT I BUILT — Clean state-handled visual fallback response by BuBuBai ULTRA
+        content: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ BuBuBai — Server Busy
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Our servers are currently at peak load.
+Please try again in a few moments. 🔄
 
-💻 CODE
-\`\`\`javascript
-// Fallback system response
-console.log("Offline state handled correctly by BubuBai AI ULTRA");
-\`\`\`
-
-📌 KEY NOTES
-• Run offline using standard \`node\` command to test execution logs cleanly.
-• Customize the browser log callback parameters inside the \`console.log\` snippet.
-• Reconnects dynamically once persistent socket API handshake is active.
-
-⚡ Built by BuBuBai ULTRA — Powered by Gamura × Selvaranjan G`,
-        timestamp: new Date()
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        timestamp: new Date(),
       };
       const finalFallback = [...updatedMessages, fallbackReply];
       setMessages(finalFallback);
@@ -422,7 +473,7 @@ console.log("Offline state handled correctly by BubuBai AI ULTRA");
         setActiveSpeechId(null);
         return;
       }
-      
+
       // Clean up punctuation, markdown headers, links, and long code blocks
       const cleanText = rawText
         .replace(/```[\s\S]*?```/g, " [Code block omitted] ")
@@ -433,27 +484,32 @@ console.log("Offline state handled correctly by BubuBai AI ULTRA");
 
       const utteranceText = cleanText.substring(0, 1000);
       const utterance = new SpeechSynthesisUtterance(utteranceText);
-      
+
       utterance.onend = () => {
         setActiveSpeechId(null);
       };
-      
+
       utterance.onerror = (e) => {
         console.error("Browser speech synthesis error:", e);
         setActiveSpeechId(null);
       };
 
       const voices = synth.getVoices();
-      const preferredVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural"))) || 
-                             voices.find(v => v.lang.startsWith("en")) || 
-                             voices[0];
-      
+      const preferredVoice =
+        voices.find(
+          (v) =>
+            v.lang.startsWith("en") &&
+            (v.name.includes("Google") || v.name.includes("Natural")),
+        ) ||
+        voices.find((v) => v.lang.startsWith("en")) ||
+        voices[0];
+
       if (preferredVoice) {
         utterance.voice = preferredVoice;
       }
       utterance.rate = 1.05;
       utterance.pitch = 1.0;
-      
+
       synth.speak(utterance);
     };
 
@@ -461,7 +517,7 @@ console.log("Offline state handled correctly by BubuBai AI ULTRA");
       const response = await fetch("/api/bububai/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text }),
       });
 
       if (!response.ok) {
@@ -473,8 +529,11 @@ console.log("Offline state handled correctly by BubuBai AI ULTRA");
         // Use standard Web Audio API to play raw PCM binary or standard Audio element
         const audio = new Audio("data:audio/wav;base64," + data.audio);
         audioRef.current = audio;
-        audio.play().catch(e => {
-          console.warn("Retrying playback using AudioContext for native raw PCM stream", e);
+        audio.play().catch((e) => {
+          console.warn(
+            "Retrying playback using AudioContext for native raw PCM stream",
+            e,
+          );
           playRawPCM64(data.audio);
         });
 
@@ -485,7 +544,10 @@ console.log("Offline state handled correctly by BubuBai AI ULTRA");
         throw new Error("No audio key returned from TTS API");
       }
     } catch (err) {
-      console.warn("API Text-To-Speech failed, falling back to browser local high-fidelity speech synthesis engine:", err);
+      console.warn(
+        "API Text-To-Speech failed, falling back to browser local high-fidelity speech synthesis engine:",
+        err,
+      );
       playSpeechWithBrowserSynth(text);
     }
   };
@@ -499,23 +561,25 @@ console.log("Offline state handled correctly by BubuBai AI ULTRA");
       for (let i = 0; i < len; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
-      
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+
+      const audioCtx = new (
+        window.AudioContext || (window as any).webkitAudioContext
+      )({ sampleRate: 24000 });
       // PCM is 16-bit linear signed integers
       const buffer = audioCtx.createBuffer(1, len / 2, 24000);
       const channelData = buffer.getChannelData(0);
       const dataView = new DataView(bytes.buffer);
-      
+
       for (let i = 0, j = 0; i < len; j++, i += 2) {
         const val = dataView.getInt16(i, true);
         channelData[j] = val / 32768.0;
       }
-      
+
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
       source.connect(audioCtx.destination);
       source.start();
-      
+
       source.onended = () => {
         setActiveSpeechId(null);
       };
@@ -527,22 +591,26 @@ console.log("Offline state handled correctly by BubuBai AI ULTRA");
 
   // Toggle Like Feedback state
   const handleLikeMessage = (id: string, currentlyLiked?: boolean) => {
-    setMessages(prev => prev.map(m => {
-      if (m.id === id) {
-        return { ...m, isLiked: !currentlyLiked, isDisliked: false };
-      }
-      return m;
-    }));
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id === id) {
+          return { ...m, isLiked: !currentlyLiked, isDisliked: false };
+        }
+        return m;
+      }),
+    );
   };
 
   // Toggle Dislike Feedback state
   const handleDislikeMessage = (id: string, currentlyDisliked?: boolean) => {
-    setMessages(prev => prev.map(m => {
-      if (m.id === id) {
-        return { ...m, isDisliked: !currentlyDisliked, isLiked: false };
-      }
-      return m;
-    }));
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id === id) {
+          return { ...m, isDisliked: !currentlyDisliked, isLiked: false };
+        }
+        return m;
+      }),
+    );
   };
 
   // Create a brand new chat session instantly
@@ -552,14 +620,16 @@ console.log("Offline state handled correctly by BubuBai AI ULTRA");
     isNewSessionRef.current = true;
     setInputValue("");
     setChatSummary("");
-    
+
+    if (onChangeChatId) {
+      onChangeChatId(newId);
+    }
+
     const welcomeMsg: ChatMessage = {
       id: `m-welcome-${Date.now()}`,
       role: "model",
-      content: `Hello **${displayName}**! I am **BuBuBai**, your elite developer companion Combining ChatGPT, Claude, and Gemini.
-
-What shall we design, optimize, or build today? ⚡`,
-      timestamp: new Date()
+      content: `Hey ${displayName}! 👋 I'm BuBuBai — elite AI for code, design & everything.\nWhat are we building today?`,
+      timestamp: new Date(),
     };
     setMessages([welcomeMsg]);
   };
@@ -579,44 +649,58 @@ What shall we design, optimize, or build today? ⚡`,
     if (lastUserIndex !== -1) {
       const promptText = messages[lastUserIndex].content;
       // Slice and trigger reply fetch again
-      setMessages(prev => prev.slice(0, lastUserIndex + 1));
+      setMessages((prev) => prev.slice(0, lastUserIndex + 1));
       setIsLoading(true);
 
       const historyPayload = trimHistoryToContextWindow(
-        messages.slice(0, lastUserIndex).map(m => ({
+        messages.slice(0, lastUserIndex).map((m) => ({
           role: m.role,
-          content: m.content
+          content: m.content,
         })),
-        6000
+        6000,
       );
 
       fetch("/api/bububai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: promptText, history: historyPayload, method: selectedMethod })
+        body: JSON.stringify({
+          message: promptText,
+          history: historyPayload,
+          method: selectedMethod,
+          temperature: localStorage.getItem("bububai_chat_temp")
+            ? parseFloat(localStorage.getItem("bububai_chat_temp")!)
+            : undefined,
+        }),
       })
-      .then(res => res.json())
-      .then(data => {
-        const replyMsg: ChatMessage = {
-          id: `m-model-${Date.now()}`,
-          role: "model",
-          content: data.text || "No response returned.",
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, replyMsg]);
-      })
-      .catch(() => {
-        const fallbackReply: ChatMessage = {
-          id: `m-model-fallback-${Date.now()}`,
-          role: "model",
-          content: `Unable to regenerate. Please check connection.`,
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, fallbackReply]);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+        .then((res) => res.json())
+        .then((data) => {
+          const replyMsg: ChatMessage = {
+            id: `m-model-${Date.now()}`,
+            role: "model",
+            content: data.text || "No response returned.",
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, replyMsg]);
+        })
+        .catch(() => {
+          const fallbackReply: ChatMessage = {
+            id: `m-model-fallback-${Date.now()}`,
+            role: "model",
+            content: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ BuBuBai — Server Busy
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Our servers are currently at peak load.
+Please try again in a few moments. 🔄
+
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, fallbackReply]);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
   };
 
@@ -627,29 +711,40 @@ What shall we design, optimize, or build today? ⚡`,
     setEditingMessageId(null);
 
     // Find the index of the edited message
-    const msgIndex = messages.findIndex(m => m.id === messageId);
+    const msgIndex = messages.findIndex((m) => m.id === messageId);
     if (msgIndex === -1) return;
 
     // Build the pruned message list up to this edited point, updating the edited message
-    const targetMsg: ChatMessage = { ...messages[msgIndex], content: newContent, timestamp: new Date() };
+    const targetMsg: ChatMessage = {
+      ...messages[msgIndex],
+      content: newContent,
+      timestamp: new Date(),
+    };
     const truncatedHistory = messages.slice(0, msgIndex);
     const updatedMessages = [...truncatedHistory, targetMsg];
-    
+
     setMessages(updatedMessages);
     setIsLoading(true);
     saveChatSession(updatedMessages);
 
     // Prune history using context window prior to API call
     const contextHistory = trimHistoryToContextWindow(
-      truncatedHistory.map(m => ({ role: m.role, content: m.content })),
-      6000
+      truncatedHistory.map((m) => ({ role: m.role, content: m.content })),
+      6000,
     );
 
     try {
       const response = await fetch("/api/bububai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: newContent, history: contextHistory, method: selectedMethod })
+        body: JSON.stringify({
+          message: newContent,
+          history: contextHistory,
+          method: selectedMethod,
+          temperature: localStorage.getItem("bububai_chat_temp")
+            ? parseFloat(localStorage.getItem("bububai_chat_temp")!)
+            : undefined,
+        }),
       });
 
       const data = await response.json();
@@ -657,7 +752,7 @@ What shall we design, optimize, or build today? ⚡`,
         id: `m-model-${Date.now()}`,
         role: "model",
         content: data.text || "No reply was returned.",
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
       const finalMessages = [...updatedMessages, replyMsg];
@@ -668,8 +763,15 @@ What shall we design, optimize, or build today? ⚡`,
       const fallbackReply: ChatMessage = {
         id: `m-model-fallback-${Date.now()}`,
         role: "model",
-        content: `Regeneration failed.\n\n\`\`\`javascript\nconsole.error("Local offline fallback triggered during edited regeneration");\n\`\`\`\n\n⚡ Built by BuBuBai — Powered by Gamura`,
-        timestamp: new Date()
+        content: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ BuBuBai — Server Busy
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Our servers are currently at peak load.
+Please try again in a few moments. 🔄
+
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+        timestamp: new Date(),
       };
       const finalFallback = [...updatedMessages, fallbackReply];
       setMessages(finalFallback);
@@ -703,7 +805,7 @@ What shall we design, optimize, or build today? ⚡`,
       yml: "yml",
       toml: "toml",
       markdown: "md",
-      md: "md"
+      md: "md",
     };
     const ext = extMap[language.toLowerCase()] || "txt";
     const filename = `bububai_code.${ext}`;
@@ -722,11 +824,13 @@ What shall we design, optimize, or build today? ⚡`,
   // Share Response
   const handleShare = (text: string) => {
     if (navigator.share) {
-      navigator.share({
-        title: "BuBuBai AI Code Output",
-        text: text,
-        url: window.location.href
-      }).catch(err => console.log(err));
+      navigator
+        .share({
+          title: "BuBuBai AI Code Output",
+          text: text,
+          url: window.location.href,
+        })
+        .catch((err) => console.log(err));
     } else {
       navigator.clipboard.writeText(text);
       alert("AI code response link copied to clipboard for easy sharing!");
@@ -734,8 +838,11 @@ What shall we design, optimize, or build today? ⚡`,
   };
 
   // Find the previous code block with different content to compare against
-  const findPreviousCodeBlock = (currentMsgId: string, currentCodeText: string) => {
-    const msgIdx = messages.findIndex(m => m.id === currentMsgId);
+  const findPreviousCodeBlock = (
+    currentMsgId: string,
+    currentCodeText: string,
+  ) => {
+    const msgIdx = messages.findIndex((m) => m.id === currentMsgId);
     if (msgIdx === -1) return null;
 
     for (let i = msgIdx - 1; i >= 0; i--) {
@@ -747,7 +854,11 @@ What shall we design, optimize, or build today? ⚡`,
           if (part.startsWith("```") && part.endsWith("```")) {
             const match = part.match(/```(\w*)\n([\s\S]*?)```/);
             const prevCodeText = match ? match[2] : part.slice(3, -3);
-            if (prevCodeText && prevCodeText.trim() && prevCodeText.trim() !== currentCodeText.trim()) {
+            if (
+              prevCodeText &&
+              prevCodeText.trim() &&
+              prevCodeText.trim() !== currentCodeText.trim()
+            ) {
               return prevCodeText;
             }
           }
@@ -792,7 +903,7 @@ What shall we design, optimize, or build today? ⚡`,
           oldLineNum: i,
           newLineNum: j,
           type: "unchanged",
-          text: oldLines[i - 1]
+          text: oldLines[i - 1],
         });
         i--;
         j--;
@@ -801,7 +912,7 @@ What shall we design, optimize, or build today? ⚡`,
           oldLineNum: null,
           newLineNum: j,
           type: "added",
-          text: newLines[j - 1]
+          text: newLines[j - 1],
         });
         j--;
       } else {
@@ -809,15 +920,23 @@ What shall we design, optimize, or build today? ⚡`,
           oldLineNum: i,
           newLineNum: null,
           type: "removed",
-          text: oldLines[i - 1]
+          text: oldLines[i - 1],
         });
         i--;
       }
     }
 
     interface DiffRow {
-      left: { num: number | null; text: string; type: "removed" | "unchanged" | "empty" };
-      right: { num: number | null; text: string; type: "added" | "unchanged" | "empty" };
+      left: {
+        num: number | null;
+        text: string;
+        type: "removed" | "unchanged" | "empty";
+      };
+      right: {
+        num: number | null;
+        text: string;
+        type: "added" | "unchanged" | "empty";
+      };
     }
 
     const rows: DiffRow[] = [];
@@ -828,12 +947,12 @@ What shall we design, optimize, or build today? ⚡`,
       if (item.type === "unchanged") {
         rows.push({
           left: { num: item.oldLineNum, text: item.text, type: "unchanged" },
-          right: { num: item.newLineNum, text: item.text, type: "unchanged" }
+          right: { num: item.newLineNum, text: item.text, type: "unchanged" },
         });
         idx++;
       } else {
-        const removedPool: typeof item[] = [];
-        const addedPool: typeof item[] = [];
+        const removedPool: (typeof item)[] = [];
+        const addedPool: (typeof item)[] = [];
 
         while (idx < diffList.length && diffList[idx].type !== "unchanged") {
           if (diffList[idx].type === "removed") {
@@ -850,8 +969,12 @@ What shall we design, optimize, or build today? ⚡`,
           const add = addedPool[k];
 
           rows.push({
-            left: rem ? { num: rem.oldLineNum, text: rem.text, type: "removed" } : { num: null, text: "", type: "empty" },
-            right: add ? { num: add.newLineNum, text: add.text, type: "added" } : { num: null, text: "", type: "empty" }
+            left: rem
+              ? { num: rem.oldLineNum, text: rem.text, type: "removed" }
+              : { num: null, text: "", type: "empty" },
+            right: add
+              ? { num: add.newLineNum, text: add.text, type: "added" }
+              : { num: null, text: "", type: "empty" },
           });
         }
       }
@@ -863,7 +986,7 @@ What shall we design, optimize, or build today? ⚡`,
   // A pristine and custom Markdown compiler to securely parse code blocks and lists elegantly
   const renderFormattedContent = (content: string, messageId: string) => {
     const parts = content.split(/(```[\s\S]*?```)/g);
-    
+
     return parts.map((part, index) => {
       // Check if it's a code block
       if (part.startsWith("```") && part.endsWith("```")) {
@@ -893,9 +1016,14 @@ What shall we design, optimize, or build today? ⚡`,
         }
 
         return (
-          <div key={index} className={`my-6 border rounded-2xl overflow-hidden shadow-sm transition-all duration-200 ${isDarkSyntax ? "border-[#e2e2de]/80 bg-neutral-950" : "border-neutral-200 bg-[#f9f9fb]"}`}>
+          <div
+            key={index}
+            className={`my-6 border rounded-2xl overflow-hidden shadow-sm transition-all duration-200 ${isDarkSyntax ? "border-[#e2e2de]/80 bg-neutral-950" : "border-neutral-200 bg-[#f9f9fb]"}`}
+          >
             {/* Header bar */}
-            <div className={`flex items-center justify-between px-4 py-2 border-b transition-all duration-200 ${isDarkSyntax ? "bg-neutral-900 border-neutral-800 text-neutral-300" : "bg-neutral-100 border-neutral-200 text-neutral-700"}`}>
+            <div
+              className={`flex items-center justify-between px-4 py-2 border-b transition-all duration-200 ${isDarkSyntax ? "bg-neutral-900 border-neutral-800 text-neutral-300" : "bg-neutral-100 border-neutral-200 text-neutral-700"}`}
+            >
               <div className="flex items-center gap-2">
                 <FileCode className="w-4 h-4 text-emerald-500" />
                 <span className="font-mono text-xs uppercase tracking-wider font-semibold">
@@ -908,23 +1036,42 @@ What shall we design, optimize, or build today? ⚡`,
                   <>
                     <button
                       type="button"
-                      className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${isDiffActive ? 'text-emerald-500 font-bold' : (isDarkSyntax ? 'text-neutral-400 hover:text-white' : 'text-neutral-600 hover:text-neutral-900')}`}
-                      onClick={() => setActiveDiffs(prev => ({ ...prev, [blockId]: !prev[blockId] }))}
+                      className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${isDiffActive ? "text-emerald-500 font-bold" : isDarkSyntax ? "text-neutral-400 hover:text-white" : "text-neutral-600 hover:text-neutral-900"}`}
+                      onClick={() =>
+                        setActiveDiffs((prev) => ({
+                          ...prev,
+                          [blockId]: !prev[blockId],
+                        }))
+                      }
                       title="Toggle Side-by-Side Diff View"
                     >
-                      <GitCompare className={`w-3.5 h-3.5 ${isDiffActive ? "rotate-180 text-emerald-500" : "text-emerald-500"}`} />
+                      <GitCompare
+                        className={`w-3.5 h-3.5 ${isDiffActive ? "rotate-180 text-emerald-500" : "text-emerald-500"}`}
+                      />
                       <span>{isDiffActive ? "Hide Diff" : "Show Diff"}</span>
                     </button>
-                    <span className={isDarkSyntax ? "text-neutral-700 select-none" : "text-neutral-300 select-none"}>|</span>
+                    <span
+                      className={
+                        isDarkSyntax
+                          ? "text-neutral-700 select-none"
+                          : "text-neutral-300 select-none"
+                      }
+                    >
+                      |
+                    </span>
                   </>
                 )}
 
                 {/* Theme Toggle Button */}
                 <button
                   type="button"
-                  className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${isDarkSyntax ? 'text-neutral-400 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'}`}
+                  className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${isDarkSyntax ? "text-neutral-400 hover:text-white" : "text-neutral-600 hover:text-neutral-900"}`}
                   onClick={() => setIsDarkSyntax(!isDarkSyntax)}
-                  title={isDarkSyntax ? "Switch to Light Syntax Theme" : "Switch to Dark Syntax Theme"}
+                  title={
+                    isDarkSyntax
+                      ? "Switch to Light Syntax Theme"
+                      : "Switch to Dark Syntax Theme"
+                  }
                 >
                   {isDarkSyntax ? (
                     <>
@@ -938,27 +1085,45 @@ What shall we design, optimize, or build today? ⚡`,
                     </>
                   )}
                 </button>
-                <span className={isDarkSyntax ? "text-neutral-700 select-none" : "text-neutral-300 select-none"}>|</span>
+                <span
+                  className={
+                    isDarkSyntax
+                      ? "text-neutral-700 select-none"
+                      : "text-neutral-300 select-none"
+                  }
+                >
+                  |
+                </span>
 
                 <button
                   type="button"
-                  className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${isDarkSyntax ? 'text-neutral-400 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'}`}
+                  className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${isDarkSyntax ? "text-neutral-400 hover:text-white" : "text-neutral-600 hover:text-neutral-900"}`}
                   onClick={() => handleDownloadCode(codeText, language)}
                   title="Download Code File"
                 >
                   <Download className="w-3.5 h-3.5 text-emerald-500" />
                   <span>Download File</span>
                 </button>
-                <span className={isDarkSyntax ? "text-neutral-700 select-none" : "text-neutral-300 select-none"}>|</span>
+                <span
+                  className={
+                    isDarkSyntax
+                      ? "text-neutral-700 select-none"
+                      : "text-neutral-300 select-none"
+                  }
+                >
+                  |
+                </span>
                 <button
                   type="button"
-                  className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${isDarkSyntax ? 'text-neutral-400 hover:text-white' : 'text-neutral-600 hover:text-neutral-900'}`}
+                  className={`flex items-center gap-1.5 text-xs transition-colors cursor-pointer ${isDarkSyntax ? "text-neutral-400 hover:text-white" : "text-neutral-600 hover:text-neutral-900"}`}
                   onClick={() => handleCopyCode(codeText, blockId)}
                 >
                   {copyCodeSuccess === blockId ? (
                     <>
                       <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400 font-medium">Copied!</span>
+                      <span className="text-emerald-400 font-medium">
+                        Copied!
+                      </span>
                     </>
                   ) : (
                     <>
@@ -969,70 +1134,103 @@ What shall we design, optimize, or build today? ⚡`,
                 </button>
               </div>
             </div>
-            
+
             {/* Viewport content - Side-by-Side Diff or Highlighted Code block */}
             {isDiffActive && previousBlockText ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x border-t transition-all duration-200 border-neutral-200 bg-white">
                 {/* Left Panel: Original / Removed */}
-                <div className={`overflow-x-auto p-4 font-mono text-[13px] leading-relaxed select-text transition-all duration-200 ${isDarkSyntax ? "bg-[#18181b] text-neutral-300 border-neutral-800" : "bg-[#fcfcfd] text-neutral-700"}`}>
+                <div
+                  className={`overflow-x-auto p-4 font-mono text-[13px] leading-relaxed select-text transition-all duration-200 ${isDarkSyntax ? "bg-[#18181b] text-neutral-300 border-neutral-800" : "bg-[#fcfcfd] text-neutral-700"}`}
+                >
                   <div className="text-[10px] font-sans font-bold text-red-500 uppercase tracking-widest mb-3 flex items-center gap-1.5 border-b pb-1 select-none">
                     <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse"></span>
                     <span>Original Code</span>
                   </div>
                   <div className="space-y-0.5">
-                    {getAlignedDiffRows(previousBlockText, codeText).map((row, rIdx) => {
-                      const isRemoved = row.left.type === 'removed';
-                      const isEmpty = row.left.type === 'empty';
-                      return (
-                        <div key={rIdx} className={`flex items-start font-mono text-[11.5px] leading-none min-h-[1.5rem] py-0.5 px-1 rounded ${
-                          isRemoved 
-                            ? (isDarkSyntax ? "bg-red-950/40 text-red-200 border-l-2 border-red-500" : "bg-red-50/70 text-red-900 border-l-2 border-red-500") 
-                            : isEmpty 
-                              ? "opacity-20" 
-                              : (isDarkSyntax ? "text-neutral-500" : "text-neutral-400")
-                        }`}>
-                          <span className="w-8 shrink-0 select-none text-[10px] opacity-40 font-mono text-right pr-2">
-                            {row.left.num || ""}
-                          </span>
-                          <pre className="whitespace-pre flex-1 font-mono">{row.left.text}</pre>
-                        </div>
-                      );
-                    })}
+                    {getAlignedDiffRows(previousBlockText, codeText).map(
+                      (row, rIdx) => {
+                        const isRemoved = row.left.type === "removed";
+                        const isEmpty = row.left.type === "empty";
+                        return (
+                          <div
+                            key={rIdx}
+                            className={`flex items-start font-mono text-[11.5px] leading-none min-h-[1.5rem] py-0.5 px-1 rounded ${
+                              isRemoved
+                                ? isDarkSyntax
+                                  ? "bg-red-950/40 text-red-200 border-l-2 border-red-500"
+                                  : "bg-red-50/70 text-red-900 border-l-2 border-red-500"
+                                : isEmpty
+                                  ? "opacity-20"
+                                  : isDarkSyntax
+                                    ? "text-neutral-500"
+                                    : "text-neutral-400"
+                            }`}
+                          >
+                            <span className="w-8 shrink-0 select-none text-[10px] opacity-40 font-mono text-right pr-2">
+                              {row.left.num || ""}
+                            </span>
+                            <pre className="whitespace-pre flex-1 font-mono">
+                              {row.left.text}
+                            </pre>
+                          </div>
+                        );
+                      },
+                    )}
                   </div>
                 </div>
 
                 {/* Right Panel: Updated / Added */}
-                <div className={`overflow-x-auto p-4 font-mono text-[13px] leading-relaxed select-text transition-all duration-200 ${isDarkSyntax ? "bg-neutral-950 text-neutral-100" : "bg-[#f9f9fb] text-neutral-800"}`}>
+                <div
+                  className={`overflow-x-auto p-4 font-mono text-[13px] leading-relaxed select-text transition-all duration-200 ${isDarkSyntax ? "bg-neutral-950 text-neutral-100" : "bg-[#f9f9fb] text-neutral-800"}`}
+                >
                   <div className="text-[10px] font-sans font-bold text-emerald-500 uppercase tracking-widest mb-3 flex items-center gap-1.5 border-b pb-1 select-none">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span>Updated Code</span>
                   </div>
                   <div className="space-y-0.5">
-                    {getAlignedDiffRows(previousBlockText, codeText).map((row, rIdx) => {
-                      const isAdded = row.right.type === 'added';
-                      const isEmpty = row.right.type === 'empty';
-                      return (
-                        <div key={rIdx} className={`flex items-start font-mono text-[11.5px] leading-none min-h-[1.5rem] py-0.5 px-1 rounded ${
-                          isAdded 
-                            ? (isDarkSyntax ? "bg-emerald-950/40 text-emerald-250 border-l-2 border-emerald-500" : "bg-emerald-50/70 text-emerald-900 border-l-2 border-emerald-500") 
-                            : isEmpty 
-                              ? "opacity-20" 
-                              : (isDarkSyntax ? "text-neutral-300" : "text-neutral-600")
-                        }`}>
-                          <span className="w-8 shrink-0 select-none text-[10px] opacity-40 font-mono text-right pr-2">
-                            {row.right.num || ""}
-                          </span>
-                          <pre className="whitespace-pre flex-1 font-mono">{row.right.text}</pre>
-                        </div>
-                      );
-                    })}
+                    {getAlignedDiffRows(previousBlockText, codeText).map(
+                      (row, rIdx) => {
+                        const isAdded = row.right.type === "added";
+                        const isEmpty = row.right.type === "empty";
+                        return (
+                          <div
+                            key={rIdx}
+                            className={`flex items-start font-mono text-[11.5px] leading-none min-h-[1.5rem] py-0.5 px-1 rounded ${
+                              isAdded
+                                ? isDarkSyntax
+                                  ? "bg-emerald-950/40 text-emerald-250 border-l-2 border-emerald-500"
+                                  : "bg-emerald-50/70 text-emerald-900 border-l-2 border-emerald-500"
+                                : isEmpty
+                                  ? "opacity-20"
+                                  : isDarkSyntax
+                                    ? "text-neutral-300"
+                                    : "text-neutral-600"
+                            }`}
+                          >
+                            <span className="w-8 shrink-0 select-none text-[10px] opacity-40 font-mono text-right pr-2">
+                              {row.right.num || ""}
+                            </span>
+                            <pre className="whitespace-pre flex-1 font-mono">
+                              {row.right.text}
+                            </pre>
+                          </div>
+                        );
+                      },
+                    )}
                   </div>
                 </div>
               </div>
             ) : (
               /* Viewport */
-              <div className={`p-4 overflow-x-auto font-mono text-[13px] leading-relaxed select-text transition-all duration-200 ${isDarkSyntax ? "bg-neutral-950 text-neutral-100 selection:bg-emerald-950" : "bg-[#f9f9fb] text-neutral-800 selection:bg-emerald-100"}`}>
-                <pre className="whitespace-pre"><code className={`hljs language-${language} ${!isDarkSyntax ? "light-syntax" : ""}`} dangerouslySetInnerHTML={{ __html: highlightedHtml }} /></pre>
+              <div
+                className={`p-4 overflow-x-auto font-mono text-[13px] leading-relaxed select-text transition-all duration-200 ${isDarkSyntax ? "bg-neutral-950 text-neutral-100 selection:bg-emerald-950" : "bg-[#f9f9fb] text-neutral-800 selection:bg-emerald-100"}`}
+              >
+                <pre className="whitespace-pre">
+                  <code
+                    className={`hljs language-${language} ${!isDarkSyntax ? "light-syntax" : ""}`}
+                    dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+                  />
+                </pre>
               </div>
             )}
           </div>
@@ -1042,7 +1240,10 @@ What shall we design, optimize, or build today? ⚡`,
       // Standard Text styling
       const lines = part.split("\n");
       return (
-        <div key={index} className="space-y-3 font-serif leading-relaxed text-[#111110] text-[16.5px] md:text-[17.5px] font-normal tracking-normal select-text">
+        <div
+          key={index}
+          className="space-y-3 font-serif leading-relaxed text-[#111110] text-[16.5px] md:text-[17.5px] font-normal tracking-normal select-text"
+        >
           {lines.map((line, lineIdx) => {
             const cleanLine = line.trim();
             if (!cleanLine) return <div key={lineIdx} className="h-2" />;
@@ -1050,14 +1251,20 @@ What shall we design, optimize, or build today? ⚡`,
             // Headings
             if (cleanLine.startsWith("## ")) {
               return (
-                <h2 key={lineIdx} className="font-sans font-semibold text-[19px] text-[#111110] mt-6 mb-2 tracking-tight">
+                <h2
+                  key={lineIdx}
+                  className="font-sans font-semibold text-[19px] text-[#111110] mt-6 mb-2 tracking-tight"
+                >
                   {cleanLine.replace("## ", "")}
                 </h2>
               );
             }
             if (cleanLine.startsWith("# ")) {
               return (
-                <h1 key={lineIdx} className="font-sans font-bold text-[22px] text-[#111110] mt-6 mb-2 tracking-tight">
+                <h1
+                  key={lineIdx}
+                  className="font-sans font-bold text-[22px] text-[#111110] mt-6 mb-2 tracking-tight"
+                >
                   {cleanLine.replace("# ", "")}
                 </h1>
               );
@@ -1068,7 +1275,14 @@ What shall we design, optimize, or build today? ⚡`,
               const textParts = text.split(/(\*\*.*?\*\*)/g);
               return textParts.map((tPart, tIdx) => {
                 if (tPart.startsWith("**") && tPart.endsWith("**")) {
-                  return <strong key={tIdx} className="font-sans font-semibold text-[#111110]">{tPart.slice(2, -2)}</strong>;
+                  return (
+                    <strong
+                      key={tIdx}
+                      className="font-sans font-semibold text-[#111110]"
+                    >
+                      {tPart.slice(2, -2)}
+                    </strong>
+                  );
                 }
                 // Also parse inline code blocks
                 return formatInlineCode(tPart);
@@ -1080,7 +1294,10 @@ What shall we design, optimize, or build today? ⚡`,
               return codeParts.map((cPart, cIdx) => {
                 if (cPart.startsWith("`") && cPart.endsWith("`")) {
                   return (
-                    <code key={cIdx} className="font-mono text-[12.5px] bg-[#f4f4f2] text-[#c94c2e] hover:bg-neutral-100 px-1 py-0.5 rounded border border-[#ebebe8]">
+                    <code
+                      key={cIdx}
+                      className="font-mono text-[12.5px] bg-[#f4f4f2] text-[#c94c2e] hover:bg-neutral-100 px-1 py-0.5 rounded border border-[#ebebe8]"
+                    >
                       {cPart.slice(1, -1)}
                     </code>
                   );
@@ -1092,7 +1309,10 @@ What shall we design, optimize, or build today? ⚡`,
             // Bullet lists
             if (cleanLine.startsWith("- ") || cleanLine.startsWith("* ")) {
               return (
-                <ul key={lineIdx} className="list-disc pl-6 py-0.5 space-y-1 my-1">
+                <ul
+                  key={lineIdx}
+                  className="list-disc pl-6 py-0.5 space-y-1 my-1"
+                >
                   <li className="font-serif text-[#111110]">
                     {formatBoldText(cleanLine.substring(2))}
                   </li>
@@ -1112,7 +1332,7 @@ What shall we design, optimize, or build today? ⚡`,
     <div className="fixed inset-0 bg-[#ffffff] z-[950] flex flex-col h-full w-full">
       {/* ── TOP NAVIGATION HEADER ── */}
       <header className="h-[64px] border-b border-[#f4f4f2] px-6 flex items-center justify-between shrink-0 bg-white">
-        <button 
+        <button
           onClick={onBack}
           className="w-10 h-10 rounded-full flex items-center justify-center text-[#111110] hover:bg-[#f4f4f2] active:bg-neutral-150 transition-colors cursor-pointer"
           aria-label="Go Back"
@@ -1124,9 +1344,9 @@ What shall we design, optimize, or build today? ⚡`,
         <div className="flex flex-col items-center justify-center text-center">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-md overflow-hidden bg-white shrink-0 border border-neutral-200">
-              <img 
-                src="https://lh3.googleusercontent.com/d/1YQ_yqbUkfjuIDrM6rH1IYThahwYLReZw" 
-                alt="BuBuBai logo" 
+              <img
+                src="https://lh3.googleusercontent.com/d/1YQ_yqbUkfjuIDrM6rH1IYThahwYLReZw"
+                alt="BuBuBai logo"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
@@ -1142,57 +1362,58 @@ What shall we design, optimize, or build today? ⚡`,
           )}
         </div>
 
-        <button 
-          onClick={handleNewChat}
-          className="w-10 h-10 rounded-full flex items-center justify-center text-[#111110] hover:bg-[#f4f4f2] active:bg-neutral-150 transition-colors cursor-pointer"
-          title="Start New Chat"
-        >
-          <Plus className="w-5 h-5 stroke-[2.3]" />
-        </button>
-      </header>
+        <div className="relative">
+          <button
+            onClick={() => setShowPopupMenu(!showPopupMenu)}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[#111110] hover:bg-[#f4f4f2] active:bg-neutral-150 transition-colors cursor-pointer"
+            title="Options"
+          >
+            <Plus
+              className={`w-5 h-5 stroke-[2.3] transition-transform duration-200 ${showPopupMenu ? "rotate-45" : ""}`}
+            />
+          </button>
 
-      {/* ── CHATBOT METHOD SELECT TOOLBAR ── */}
-      <div className="bg-[#fcfcfb] border-b border-[#f4f4f2] px-4 py-2.5 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0 select-none">
-        <span className="text-[11px] font-sans font-bold uppercase tracking-wider text-neutral-400 pl-2 shrink-0 flex items-center gap-1">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-          <span>Engine:</span>
-        </span>
-        <div className="flex items-center gap-1.5 px-1 scrollbar-none">
-          {[
-            { id: "ultra", name: "⚡ BubuUltra", desc: "Balanced (Gemini 3.5 Flash)", color: "text-emerald-600 bg-emerald-50/50 hover:bg-emerald-50 border-emerald-100" },
-            { id: "pro", name: "🧠 CodeMaster", desc: "Elite reasoning (Gemini 3.1 Pro)", color: "text-indigo-600 bg-indigo-50/50 hover:bg-indigo-50 border-indigo-100" },
-            { id: "lite", name: "🔥 SpeedLite", desc: "Lightning fast (Gemini 3.1 Lite)", color: "text-amber-600 bg-amber-50/50 hover:bg-amber-50 border-amber-100" },
-            { id: "cto", name: "👥 TechCTO", desc: "Systems architect & CTO focus", color: "text-sky-600 bg-sky-50/50 hover:bg-sky-50 border-sky-100" },
-            { id: "designer", name: "🎨 UI Guru", desc: "Tailwind UI/UX visual master", color: "text-rose-600 bg-rose-50/50 hover:bg-rose-50 border-rose-100" },
-            { id: "local", name: "🔌 Sandbox", desc: "Zero-latency local code simulation", color: "text-[#666] bg-neutral-100/50 hover:bg-neutral-100 border-neutral-300" },
-          ].map((method) => {
-            const isActive = selectedMethod === method.id;
-            return (
-              <button
-                key={method.id}
-                type="button"
-                onClick={() => setSelectedMethod(method.id)}
-                className={`px-3 py-1.5 rounded-full border text-xs font-sans font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5 shrink-0 hover:scale-[1.02] active:scale-[0.98] ${
-                  isActive 
-                    ? "bg-[#111110] text-white border-[#111110] shadow-sm font-semibold" 
-                    : `${method.color} border-transparent text-neutral-600`
-                }`}
-                title={method.desc}
-              >
-                <span>{method.name}</span>
-              </button>
-            );
-          })}
+          {showPopupMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowPopupMenu(false)}
+              />
+              <div className="absolute top-12 right-0 bg-white border border-[#ebebe8] shadow-lg rounded-xl py-2 w-40 z-50 flex flex-col transform origin-top-right transition-all">
+                <button
+                  onClick={() => {
+                    handleNewChat();
+                    setShowPopupMenu(false);
+                  }}
+                  className="flex items-center w-full px-4 py-2.5 text-sm font-semibold text-[#111110] hover:bg-[#f4f4f2] transition-colors gap-3 justify-start cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>New Chat</span>
+                </button>
+                <div className="h-[1px] bg-[#ebebe8] w-full my-1" />
+                <a
+                  href="/tester.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center w-full px-4 py-2.5 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors gap-3 justify-start cursor-pointer"
+                  onClick={() => setShowPopupMenu(false)}
+                >
+                  <Play className="w-4 h-4 stroke-[2.5] fill-emerald-600/20" />
+                  <span>BUBUBAI TESTER</span>
+                </a>
+              </div>
+            </>
+          )}
         </div>
-      </div>
+      </header>
 
       {/* ── MESSAGES CHAT STREAM CONTAINER ── */}
       <div className="flex-1 overflow-y-auto px-4 md:px-12 py-6 space-y-8 bg-[#ffffff]">
         {messages.map((msg) => {
           const isUser = msg.role === "user";
           return (
-            <div 
-              key={msg.id} 
+            <div
+              key={msg.id}
               className={`flex flex-col ${isUser ? "items-end" : "items-start"} max-w-2xl mx-auto w-full`}
             >
               {isUser ? (
@@ -1258,9 +1479,15 @@ What shall we design, optimize, or build today? ⚡`,
                       type="button"
                       onClick={() => handleToggleSpeak(msg.content, msg.id)}
                       className={`p-1.5 rounded-lg hover:bg-[#f4f4f2] text-xs font-mono flex items-center gap-1 cursor-pointer transition-all ${
-                        activeSpeechId === msg.id ? "text-emerald-500 bg-emerald-50 border border-emerald-100 font-bold" : "hover:text-[#111110]"
+                        activeSpeechId === msg.id
+                          ? "text-emerald-500 bg-emerald-50 border border-emerald-100 font-bold"
+                          : "hover:text-[#111110]"
                       }`}
-                      title={activeSpeechId === msg.id ? "Stop Speech" : "Listen Response"}
+                      title={
+                        activeSpeechId === msg.id
+                          ? "Stop Speech"
+                          : "Listen Response"
+                      }
                     >
                       {activeSpeechId === msg.id ? (
                         <>
@@ -1280,7 +1507,9 @@ What shall we design, optimize, or build today? ⚡`,
                       type="button"
                       onClick={() => handleCopyText(msg.content, msg.id)}
                       className={`p-1.5 rounded-lg hover:bg-[#f4f4f2] text-xs font-mono flex items-center gap-1 cursor-pointer transition-all hover:text-[#111110] ${
-                        copiedMessageId === msg.id ? "text-emerald-500 font-bold" : ""
+                        copiedMessageId === msg.id
+                          ? "text-emerald-500 font-bold"
+                          : ""
                       }`}
                       title="Copy response"
                     >
@@ -1302,7 +1531,9 @@ What shall we design, optimize, or build today? ⚡`,
                       type="button"
                       onClick={() => handleLikeMessage(msg.id, msg.isLiked)}
                       className={`p-1.5 rounded-lg hover:bg-[#f4f4f2] transition-colors cursor-pointer ${
-                        msg.isLiked ? "text-emerald-500 bg-emerald-50 border border-emerald-100" : "hover:text-[#111110]"
+                        msg.isLiked
+                          ? "text-emerald-500 bg-emerald-50 border border-emerald-100"
+                          : "hover:text-[#111110]"
                       }`}
                       title="Good response"
                     >
@@ -1312,9 +1543,13 @@ What shall we design, optimize, or build today? ⚡`,
                     {/* Downvote/Dislike response feedback */}
                     <button
                       type="button"
-                      onClick={() => handleDislikeMessage(msg.id, msg.isDisliked)}
+                      onClick={() =>
+                        handleDislikeMessage(msg.id, msg.isDisliked)
+                      }
                       className={`p-1.5 rounded-lg hover:bg-[#f4f4f2] transition-colors cursor-pointer ${
-                        msg.isDisliked ? "text-red-500 bg-red-50 border border-red-100" : "hover:text-[#111110]"
+                        msg.isDisliked
+                          ? "text-red-500 bg-red-50 border border-red-100"
+                          : "hover:text-[#111110]"
                       }`}
                       title="Poor response"
                     >
@@ -1342,9 +1577,9 @@ What shall we design, optimize, or build today? ⚡`,
           <div className="flex items-start gap-3.5 max-w-2xl mx-auto w-full select-none">
             {/* Left BuBuBai avatar */}
             <div className="w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-neutral-100 shadow-sm flex items-center justify-center animate-pulse">
-              <img 
-                src="https://lh3.googleusercontent.com/d/1YQ_yqbUkfjuIDrM6rH1IYThahwYLReZw" 
-                alt="BuBuBai logo" 
+              <img
+                src="https://lh3.googleusercontent.com/d/1YQ_yqbUkfjuIDrM6rH1IYThahwYLReZw"
+                alt="BuBuBai logo"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
@@ -1356,16 +1591,25 @@ What shall we design, optimize, or build today? ⚡`,
                     BuBuBai is thinking
                   </span>
                   <div className="flex gap-1 items-center justify-center py-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce"
+                      style={{ animationDelay: "0ms" }}
+                    />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce"
+                      style={{ animationDelay: "150ms" }}
+                    />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce"
+                      style={{ animationDelay: "300ms" }}
+                    />
                   </div>
                 </div>
                 <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-bold border border-emerald-100 animate-pulse">
                   GENERATING ANSWER
                 </span>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="h-3 bg-neutral-200/60 rounded animate-pulse w-full" />
                 <div className="h-3 bg-neutral-200/60 rounded animate-pulse w-5/6" />
@@ -1382,39 +1626,41 @@ What shall we design, optimize, or build today? ⚡`,
       {/* ── BOTTOM REPLY ENTRY FORM matching CLAUDE APP screenshots ── */}
       <footer className="shrink-0 p-4 border-t border-[#f4f4f2] bg-white flex flex-col items-center justify-end w-full">
         <div className="max-w-2xl w-full flex flex-col space-y-3.5 px-1 md:px-0">
-          
           {/* Sub footnote directly above reply capsule input */}
           <div className="flex items-center justify-between w-full text-[11px] text-neutral-400 select-none">
             <div className="flex items-center gap-1.5">
-              <span>BuBuBai is AI and can make mistakes. Please double-check responses.</span>
+              <span>
+                BuBuBai is AI and can make mistakes. Please double-check
+                responses.
+              </span>
             </div>
           </div>
 
           {/* Interactive Input capsule layout */}
-          <div className="relative flex items-center bg-[#f4f4f2] rounded-[28px] p-2 pl-3 border border-[#ebebe8] shadow-sm w-full min-h-[54px]">
+          <div className="relative flex items-center bg-[#f4f4f2] rounded-[28px] p-2 pl-3 border border-[#ebebe8] shadow-sm w-full min-h-[54px] overflow-hidden group">
+            {isLoading && (
+              <div className="absolute left-[-100%] top-0 bottom-0 bg-gradient-to-r from-transparent via-[#0ea872]/20 to-transparent w-[200%] animate-[ripple_2s_linear_infinite]" />
+            )}
+
             {/* White round Plus Button that opens Bottom Sheet slide overlay info trigger */}
-            <button 
+            <button
               type="button"
-              onClick={onOpenBottomSheet}
-              className="w-10 h-10 rounded-full bg-white text-[#111110] border border-[#ebebe8] shadow-sm flex items-center justify-center shrink-0 cursor-pointer hover:bg-neutral-50 active:bg-neutral-100 transition-all mr-2"
+              onClick={() => {
+                onOpenBottomSheet((text) => {
+                  setInputValue((prev) => prev + (prev ? " " : "") + text + " ");
+                });
+              }}
+              className="w-10 h-10 rounded-full bg-white text-[#111110] border border-[#ebebe8] shadow-sm flex items-center justify-center shrink-0 cursor-pointer hover:bg-neutral-50 active:bg-neutral-100 transition-all mr-2 relative z-10"
               title="Add attachment"
             >
               <Plus className="w-[19px] h-[19px] stroke-[2.3]" />
             </button>
 
             {/* Expansible prompt field resembling standard chat */}
-            <textarea 
+            <textarea
               ref={textareaRef}
-              className="flex-1 max-h-[120px] bg-transparent text-[#111110] font-sans text-[15px] focus:outline-none resize-none pt-2.5 pb-1 px-1 leading-normal select-text"
-              placeholder={
-                selectedMethod === "ultra" ? "Ask BubuUltra (Gemini 3.5 Flash)..." :
-                selectedMethod === "pro" ? "Enter task for CodeMaster Pro..." :
-                selectedMethod === "lite" ? "Ask SpeedLite (Gemini Lite)..." :
-                selectedMethod === "cto" ? "Discuss architecture with TechCTO..." :
-                selectedMethod === "designer" ? "Describe visual design with UI Guru..." :
-                selectedMethod === "local" ? "Query sandboxed Client engine..." :
-                "Reply to BuBuBai..."
-              }
+              className="flex-1 max-h-[120px] bg-transparent text-[#111110] font-sans text-[15px] focus:outline-none resize-none pt-2.5 pb-1 px-1 leading-normal select-text relative z-10 placeholder:text-neutral-400"
+              placeholder="Ask BuBuBai..."
               rows={1}
               value={inputValue}
               onChange={handleTextareaChange}
@@ -1422,18 +1668,40 @@ What shall we design, optimize, or build today? ⚡`,
             />
 
             {/* Send Trigger button */}
-            <button 
+            <button
               type="button"
               onClick={handleSendReply}
               disabled={!inputValue.trim() || isLoading}
-              className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                inputValue.trim() 
-                  ? "bg-[#111110] text-white hover:bg-neutral-800 hover:scale-105 active:scale-95 cursor-pointer" 
+              className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 relative z-10 overflow-hidden outline-none touch-manipulation tap-highlight-transparent ${
+                inputValue.trim() || isLoading
+                  ? "bg-[#111110] text-white cursor-pointer group-focus-within:bg-emerald-600"
                   : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
-              }`}
+              } ${isLoading ? "scale-90 opacity-80" : "hover:scale-105 active:scale-95"}`}
               title="Send reply"
             >
-              <Send className="w-[16px] h-[16px] stroke-[2.2] translate-x-[1px]" />
+              <AnimatePresence mode="wait">
+                {isLoading ? (
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
+                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                    exit={{ opacity: 0, scale: 0.5, rotate: 90 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="w-4 h-4 border-[2.5px] border-white/30 border-t-white rounded-full animate-spin" />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="send"
+                    initial={{ opacity: 0, scale: 0.5, rotate: 90 }}
+                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                    exit={{ opacity: 0, scale: 0.5, rotate: -90 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Send className="w-[16px] h-[16px] stroke-[2.2] translate-x-[1px]" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </button>
           </div>
         </div>

@@ -1,0 +1,1967 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <title>BUBUBAI</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@700;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+      :root {
+        --bg: #0d0f17;
+        --sf: #141720;
+        --sf2: #1a1d2e;
+        --sf3: #1f2235;
+        --b1: #2a2d3e;
+        --b2: #353850;
+        --red: #ff3c5a;
+        --blue: #3b82f6;
+        --grn: #22d47a;
+        --yel: #f5c518;
+        --pur: #a855f7;
+        --cyn: #22d3ee;
+        --tx: #e8eaf6;
+        --tx2: #8b8fa8;
+        --tx3: #555870;
+      }
+      html,
+      body {
+        height: 100dvh;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--tx);
+        font-family: "Space Grotesk", sans-serif;
+      }
+      button,
+      select,
+      input,
+      textarea {
+        font-family: "Space Grotesk", sans-serif;
+        outline: none;
+      }
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--b2);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+        overflow: hidden;
+      }
+
+      /* TOPBAR */
+      #top {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 14px;
+        background: var(--sf);
+        border-bottom: 1px solid var(--b1);
+        flex-shrink: 0;
+        z-index: 100;
+        gap: 8px;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        text-decoration: none;
+        flex-shrink: 0;
+      }
+      .logo-ico {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--red), var(--blue));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Orbitron", monospace;
+        font-size: 14px;
+        font-weight: 900;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      .logo-txt {
+        font-family: "Orbitron", monospace;
+        font-size: 17px;
+        font-weight: 900;
+        letter-spacing: 2px;
+        white-space: nowrap;
+      }
+      .logo-txt .r {
+        color: var(--red);
+      }
+      .logo-txt .b {
+        color: var(--blue);
+      }
+      .logo-txt .g {
+        color: var(--grn);
+      }
+      .logo-txt .y {
+        color: var(--yel);
+      }
+      .badge {
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, var(--red), var(--blue));
+        color: #fff;
+        white-space: nowrap;
+      }
+      .top-l {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .top-r {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .vsep {
+        width: 1px;
+        height: 20px;
+        background: var(--b1);
+        flex-shrink: 0;
+      }
+      .tbtn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid var(--b2);
+        background: var(--sf2);
+        color: var(--tx2);
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .tbtn:hover {
+        border-color: var(--blue);
+        color: var(--tx);
+        background: var(--sf3);
+      }
+      #runBtn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 36px;
+        padding: 0 20px;
+        border-radius: 8px;
+        border: none;
+        background: linear-gradient(135deg, var(--grn), #16a855);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.18s;
+        box-shadow: 0 0 18px rgba(34, 212, 122, 0.3);
+        flex-shrink: 0;
+      }
+      #runBtn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 0 28px rgba(34, 212, 122, 0.5);
+      }
+      #runBtn:active {
+        transform: translateY(0);
+      }
+      #runBtn.running {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        box-shadow: 0 0 18px rgba(245, 158, 11, 0.3);
+      }
+      #runBtn svg {
+        width: 13px;
+        height: 13px;
+        fill: #fff;
+        flex-shrink: 0;
+      }
+      .spin {
+        width: 13px;
+        height: 13px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: rot 0.6s linear infinite;
+        flex-shrink: 0;
+      }
+      @keyframes rot {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* BODY */
+      #body {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+        min-height: 0;
+      }
+
+      /* SIDEBAR */
+      #sidebar {
+        width: 200px;
+        background: var(--sf);
+        border-right: 1px solid var(--b1);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        overflow: hidden;
+        transition:
+          width 0.25s ease,
+          opacity 0.2s ease;
+      }
+      #sidebar.off {
+        width: 0;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .sb-hd {
+        padding: 10px 14px 8px;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--tx3);
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        border-bottom: 1px solid var(--b1);
+        flex-shrink: 0;
+      }
+      #langList {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px 0;
+      }
+      .li {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--tx2);
+        border-left: 3px solid transparent;
+        transition: all 0.12s;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .li:hover {
+        background: var(--sf2);
+        color: var(--tx);
+      }
+      .li.on {
+        background: var(--sf2);
+        color: var(--tx);
+        border-left-color: var(--blue);
+      }
+      .li-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      /* CENTER */
+      #center {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      /* TABS */
+      #tabsBar {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        background: var(--sf);
+        border-bottom: 1px solid var(--b1);
+        overflow-x: auto;
+        overflow-y: hidden;
+        flex-shrink: 0;
+      }
+      #tabsBar::-webkit-scrollbar {
+        height: 2px;
+      }
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 14px;
+        height: 40px;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--tx2);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all 0.12s;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .tab:hover {
+        color: var(--tx);
+      }
+      .tab.on {
+        color: var(--blue);
+        border-bottom-color: var(--blue);
+      }
+      .tab-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .tab-x {
+        width: 15px;
+        height: 15px;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: var(--tx3);
+        transition: 0.12s;
+      }
+      .tab-x:hover {
+        background: var(--b2);
+        color: var(--red);
+      }
+      .tab-add {
+        padding: 0 12px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        font-size: 18px;
+        color: var(--tx3);
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: 0.12s;
+      }
+      .tab-add:hover {
+        color: var(--tx);
+      }
+
+      /* EDITOR TOOLBAR */
+      #etbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 5px 12px;
+        background: var(--sf2);
+        border-bottom: 1px solid var(--b1);
+        flex-shrink: 0;
+        gap: 8px;
+      }
+      .et-lang {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--tx);
+        white-space: nowrap;
+      }
+      .et-pos {
+        font-size: 11px;
+        color: var(--tx3);
+      }
+      .smb {
+        padding: 3px 9px;
+        border-radius: 5px;
+        border: 1px solid var(--b2);
+        background: var(--sf3);
+        color: var(--tx2);
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.12s;
+        white-space: nowrap;
+      }
+      .smb:hover {
+        border-color: var(--blue);
+        color: var(--tx);
+      }
+      .smb.on {
+        border-color: var(--grn);
+        color: var(--grn);
+      }
+
+      /* STDIN */
+      #stdinRow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 12px;
+        background: var(--sf2);
+        border-bottom: 1px solid var(--b1);
+        flex-shrink: 0;
+      }
+      #stdinLbl {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--tx3);
+        letter-spacing: 0.8px;
+        white-space: nowrap;
+      }
+      #stdinIn {
+        flex: 1;
+        height: 24px;
+        padding: 0 9px;
+        border-radius: 5px;
+        border: 1px solid var(--b1);
+        background: var(--bg);
+        color: var(--tx);
+        font-size: 11.5px;
+        font-family: "JetBrains Mono", monospace;
+        transition: 0.12s;
+      }
+      #stdinIn:focus {
+        border-color: var(--blue);
+      }
+
+      /* EDITOR */
+      #edBox {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+        min-height: 0;
+      }
+      #lnum {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 48px;
+        background: var(--sf2);
+        border-right: 1px solid var(--b1);
+        padding: 14px 10px 14px 0;
+        overflow: hidden;
+        pointer-events: none;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        line-height: 21px;
+        color: var(--tx3);
+        text-align: right;
+        user-select: none;
+        white-space: pre;
+      }
+      #ed {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        padding: 14px 14px 14px 62px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        line-height: 21px;
+        background: transparent;
+        color: var(--tx);
+        border: none;
+        resize: none;
+        tab-size: 4;
+        overflow: auto;
+        white-space: pre;
+        caret-color: var(--grn);
+        -webkit-overflow-scrolling: touch;
+      }
+      #ed::selection {
+        background: rgba(59, 130, 246, 0.25);
+      }
+
+      /* RESIZER */
+      #rsz {
+        height: 5px;
+        background: var(--b1);
+        cursor: row-resize;
+        flex-shrink: 0;
+        position: relative;
+        transition: background 0.12s;
+        touch-action: none;
+      }
+      #rsz::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 36px;
+        height: 3px;
+        background: var(--b2);
+        border-radius: 3px;
+      }
+      #rsz:hover,
+      #rsz.drag {
+        background: var(--blue);
+      }
+
+      /* OUTPUT */
+      #outPanel {
+        background: var(--sf);
+        border-top: 1px solid var(--b1);
+        display: flex;
+        flex-direction: column;
+        height: 220px;
+        min-height: 60px;
+        max-height: 60vh;
+        flex-shrink: 0;
+      }
+      #outHd {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 14px;
+        border-bottom: 1px solid var(--b1);
+        flex-shrink: 0;
+      }
+      .otab {
+        padding: 3px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--tx3);
+        border-radius: 5px 5px 0 0;
+        transition: 0.12s;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+      .otab.on {
+        color: var(--grn);
+        background: var(--sf2);
+      }
+      .otab:hover:not(.on) {
+        color: var(--tx2);
+      }
+      .out-r {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #execTime {
+        font-size: 10px;
+        color: var(--tx3);
+      }
+      #clrBtn {
+        padding: 3px 10px;
+        border-radius: 5px;
+        border: 1px solid var(--b2);
+        background: var(--sf2);
+        color: var(--tx2);
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: 0.12s;
+      }
+      #clrBtn:hover {
+        border-color: var(--red);
+        color: var(--red);
+      }
+      #outBody {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 16px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        line-height: 1.75;
+      }
+      .ol {
+        display: block;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .ok {
+        color: var(--grn);
+      }
+      .er {
+        color: var(--red);
+      }
+      .wa {
+        color: var(--yel);
+      }
+      .in {
+        color: var(--cyn);
+      }
+      .ph {
+        color: var(--tx3);
+        font-style: italic;
+      }
+      .dim {
+        color: var(--tx2);
+        font-size: 11px;
+      }
+
+      /* STATUS BAR */
+      #statusbar {
+        height: 24px;
+        background: var(--sf);
+        border-top: 1px solid var(--b1);
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        gap: 18px;
+        font-size: 11px;
+        color: var(--tx3);
+        flex-shrink: 0;
+      }
+      .si {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .sd {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--grn);
+        flex-shrink: 0;
+      }
+      .sd.r {
+        background: var(--red);
+      }
+      .sd.y {
+        background: var(--yel);
+      }
+
+      /* MODALS */
+      .ov {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 500;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      .ov.open {
+        display: flex;
+      }
+      .modal {
+        background: var(--sf);
+        border: 1px solid var(--b2);
+        border-radius: 14px;
+        padding: 24px;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 36px 72px rgba(0, 0, 0, 0.65);
+      }
+      .modal h2 {
+        font-family: "Orbitron", monospace;
+        font-size: 15px;
+        margin-bottom: 16px;
+        color: var(--tx);
+      }
+      .modal p {
+        font-size: 12px;
+        color: var(--tx2);
+        margin-bottom: 12px;
+        line-height: 1.5;
+      }
+      .modal input {
+        width: 100%;
+        padding: 9px 12px;
+        border-radius: 7px;
+        border: 1px solid var(--b2);
+        background: var(--sf2);
+        color: var(--tx);
+        font-size: 12.5px;
+        display: block;
+        margin-bottom: 10px;
+        transition: 0.12s;
+      }
+      .modal input:focus {
+        border-color: var(--blue);
+      }
+      .mrow {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 8px;
+      }
+      .mbtn {
+        padding: 8px 18px;
+        border-radius: 7px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.12s;
+      }
+      .mbtn.cancel {
+        background: var(--sf2);
+        border: 1px solid var(--b2);
+        color: var(--tx2);
+      }
+      .mbtn.cancel:hover {
+        border-color: var(--red);
+        color: var(--red);
+      }
+      .mbtn.ok {
+        background: linear-gradient(135deg, var(--blue), var(--pur));
+        border: none;
+        color: #fff;
+      }
+      .mbtn.ok:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 14px rgba(59, 130, 246, 0.3);
+      }
+
+      /* MOBILE BAR */
+      #mbar {
+        display: none;
+        height: 52px;
+        background: var(--sf);
+        border-top: 1px solid var(--b1);
+        align-items: center;
+        justify-content: space-around;
+        flex-shrink: 0;
+      }
+      .mbt {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        cursor: pointer;
+        color: var(--tx3);
+        font-size: 8.5px;
+        font-weight: 700;
+        min-width: 50px;
+        padding: 4px;
+        transition: 0.12s;
+        letter-spacing: 0.3px;
+      }
+      .mbt .ico {
+        font-size: 20px;
+        line-height: 1;
+      }
+      .mbt:hover {
+        color: var(--blue);
+      }
+      .mbt.run-m {
+        color: var(--grn);
+      }
+      .mbt.run-m.busy {
+        color: var(--yel);
+      }
+      #mbd {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 150;
+        display: none;
+      }
+      #mbd.open {
+        display: block;
+      }
+
+      /* HINT */
+      #hint {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--sf2);
+        border: 1px solid var(--b2);
+        border-radius: 8px;
+        padding: 7px 14px;
+        font-size: 11px;
+        color: var(--tx2);
+        animation: fo 2s forwards 4s;
+        pointer-events: none;
+        z-index: 300;
+        white-space: nowrap;
+      }
+      @keyframes fo {
+        to {
+          opacity: 0;
+          visibility: hidden;
+        }
+      }
+
+      /* RESPONSIVE */
+      @media (max-width: 768px) {
+        .badge,
+        .vsep,
+        .tbtn:not(#sbBtn) {
+          display: none !important;
+        }
+        #statusbar {
+          display: none;
+        }
+        #mbar {
+          display: flex !important;
+        }
+        #sidebar {
+          display: none !important;
+        }
+        #sidebar.mob {
+          display: flex !important;
+          position: fixed;
+          top: 52px;
+          bottom: 52px;
+          left: 0;
+          z-index: 200;
+          width: 220px !important;
+          opacity: 1 !important;
+          pointer-events: all !important;
+          box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+        }
+        #body {
+          height: calc(100dvh - 104px);
+        }
+        #top {
+          padding: 0 10px;
+          gap: 6px;
+        }
+        .logo-txt {
+          font-size: 15px;
+        }
+        #runBtn {
+          height: 32px;
+          padding: 0 14px;
+          font-size: 12px;
+        }
+      }
+      @media (max-width: 400px) {
+        .logo-txt {
+          font-size: 13px;
+        }
+        .logo-ico {
+          width: 26px;
+          height: 26px;
+          font-size: 12px;
+        }
+      }
+      @media (min-width: 1400px) {
+        #lnum,
+        #ed {
+          font-size: 14px;
+          line-height: 22px;
+        }
+        #sidebar {
+          width: 215px;
+        }
+      }
+      @media (min-width: 1920px) {
+        #lnum,
+        #ed {
+          font-size: 15px;
+          line-height: 24px;
+        }
+        #top {
+          height: 56px;
+        }
+        #body {
+          height: calc(100dvh - 80px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="top">
+        <div class="top-l">
+          <a class="logo" href="#">
+            <img
+              src="https://lh3.googleusercontent.com/d/1K0M7bYtdycSjgmTQoUH3NLkT1zxisZ6x"
+              alt="BUBUBAI"
+              referrerpolicy="no-referrer"
+              style="
+                width: 32px;
+                height: 32px;
+                border-radius: 8px;
+                object-fit: cover;
+                flex-shrink: 0;
+              "
+            />
+            <div class="logo-txt">
+              <span class="r">GA</span><span class="b">M</span
+              ><span class="g">UR</span><span class="y">A</span>
+            </div>
+            <div class="badge">TESTER</div>
+          </a>
+          <div class="vsep"></div>
+          <button class="tbtn" id="newBtn">&#xff0b; New</button>
+          <button class="tbtn" id="saveBtn">&#128190; Save</button>
+          <button class="tbtn" id="shareBtn">&#128279; Share</button>
+        </div>
+        <div class="top-r">
+          <button class="tbtn" id="sbBtn">&#9776; Langs</button>
+          <button class="tbtn" id="themeBtn">&#9728; Light</button>
+          <button id="runBtn">
+            <svg viewBox="0 0 16 16"><path d="M3 2l11 6-11 6z" /></svg>
+            Run
+          </button>
+        </div>
+      </div>
+
+      <div id="body">
+        <div id="sidebar">
+          <div class="sb-hd">Languages</div>
+          <div id="langList"></div>
+        </div>
+        <div id="center">
+          <div id="tabsBar"></div>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              flex: 1;
+              min-height: 0;
+              overflow: hidden;
+            "
+          >
+            <div id="etbar">
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  min-width: 0;
+                "
+              >
+                <span class="et-lang" id="etLang">JavaScript</span>
+                <span class="et-pos" id="etPos">Ln 1, Col 1</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 5px;
+                  flex-shrink: 0;
+                "
+              >
+                <button class="smb" id="fmBtn">A&#8722;</button>
+                <button class="smb" id="fpBtn">A&#43;</button>
+                <button class="smb" id="wrapBtn">Wrap</button>
+                <button class="smb" id="ntBtn">&#43;Tab</button>
+              </div>
+            </div>
+            <div id="stdinRow">
+              <span id="stdinLbl">STDIN</span>
+              <input
+                id="stdinIn"
+                type="text"
+                placeholder="Program input (optional)&#x2026;"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </div>
+            <div id="edBox">
+              <div id="lnum"></div>
+              <textarea
+                id="ed"
+                spellcheck="false"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+              ></textarea>
+            </div>
+            <div id="rsz"></div>
+            <div id="outPanel">
+              <div id="outHd">
+                <div style="display: flex; gap: 3px">
+                  <div class="otab on">Output</div>
+                  <div class="otab">Errors</div>
+                  <div class="otab">Info</div>
+                </div>
+                <div class="out-r">
+                  <span id="execTime"></span>
+                  <button id="clrBtn">Clear</button>
+                </div>
+              </div>
+              <div id="outBody">
+                <span class="ol ph"
+                  >&#9658; Press Run (or Ctrl+Enter) to execute your
+                  code&#x2026;</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="statusbar">
+        <div class="si">
+          <div class="sd" id="stDot"></div>
+          <span id="stMsg">Ready</span>
+        </div>
+        <div class="si" id="stLang">JavaScript</div>
+        <div class="si" id="stLines">1 line</div>
+        <div class="si" id="stChars">0 chars</div>
+        <div class="si" style="margin-left: auto">BUBUBAI TESTER v1.0</div>
+      </div>
+
+      <div id="mbar">
+        <div class="mbt" id="mLangs">
+          <div class="ico">&#9000;</div>
+          LANGS
+        </div>
+        <div class="mbt" id="mSave">
+          <div class="ico">&#128190;</div>
+          SAVE
+        </div>
+        <div class="mbt run-m" id="mRun">
+          <div class="ico">&#9654;</div>
+          RUN
+        </div>
+        <div class="mbt" id="mTheme">
+          <div class="ico">&#127912;</div>
+          THEME
+        </div>
+        <div class="mbt" id="mShare">
+          <div class="ico">&#128279;</div>
+          SHARE
+        </div>
+      </div>
+      <div id="mbd"></div>
+
+      <div class="ov" id="saveModal">
+        <div class="modal">
+          <h2>&#128190; Save File</h2>
+          <input type="text" id="saveName" placeholder="main.js" />
+          <div class="mrow">
+            <button class="mbtn cancel" id="saveCancelBtn">Cancel</button>
+            <button class="mbtn ok" id="saveOkBtn">Download</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ov" id="shareModal">
+        <div class="modal">
+          <h2>&#128279; Share Code</h2>
+          <p>Copy this link to share your code:</p>
+          <input
+            type="text"
+            id="shareLink"
+            readonly
+            style="
+              cursor: pointer;
+              color: var(--grn);
+              font-family: &quot;JetBrains Mono&quot;, monospace;
+              font-size: 11px;
+            "
+          />
+          <div class="mrow">
+            <button class="mbtn cancel" id="shareCancelBtn">Close</button>
+            <button class="mbtn ok" id="shareCopyBtn">Copy Link</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="hint">
+        Ctrl+Enter&#160;Run &#160;|&#160; Ctrl+S&#160;Save &#160;|&#160;
+        Tab&#160;Indent
+      </div>
+    </div>
+
+    <script>
+      var LANGS = [
+        {
+          id: "javascript",
+          n: "JavaScript",
+          c: "#f5c518",
+          e: ".js",
+          code: '// JavaScript - BUBUBAI Compiler\nconsole.log("Hello from BUBUBAI! \uD83C\uDFAE");\n\nconst greet = name => `Welcome, ${name}!`;\nconsole.log(greet("Developer"));\n\nconst nums = [1,2,3,4,5,6,7,8,9,10];\nconst evens = nums.filter(n => n%2===0).map(n => n*n);\nconsole.log("Even squares:", evens);\n\nconst fib = n => n<=1 ? n : fib(n-1)+fib(n-2);\nconsole.log("Fibonacci:", Array.from({length:8},(_,i)=>fib(i)).join(", "));\n\nconst p = {name:"BuBuBaiRacer",score:9999,level:42};\nconsole.log(`${p.name} | Score: ${p.score} | Level: ${p.level}`);',
+        },
+
+        {
+          id: "typescript",
+          n: "TypeScript",
+          c: "#3b82f6",
+          e: ".ts",
+          code: '// TypeScript - BUBUBAI Compiler\ninterface Player {\n  name: string;\n  score: number;\n  level: number;\n}\n\nconst createPlayer = (name: string): Player => ({name, score:0, level:1});\nconst levelUp = (p: Player): Player => ({...p, level:p.level+1, score:p.score+p.level*150});\n\nlet player = createPlayer("BuBuBaiRacer");\nfor (let i=0; i<6; i++) {\n  player = levelUp(player);\n  console.log(`Level ${player.level} | Score: ${player.score}`);\n}\nfunction first<T>(arr: T[]): T { return arr[0]; }\nconsole.log("First prime:", first([2,3,5,7,11]));',
+        },
+
+        {
+          id: "html",
+          n: "HTML",
+          c: "#f97316",
+          e: ".html",
+          code: '<!DOCTYPE html>\n<html>\n<head>\n  <title>BUBUBAI</title>\n  <style>\n    body{margin:0;background:#0d0f17;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}\n    .card{background:#141720;border:1px solid #2a2d3e;border-radius:20px;padding:48px;text-align:center;max-width:400px}\n    h1{font-size:2.4rem;font-weight:900;letter-spacing:2px;margin-bottom:12px}\n    .r{color:#ff3c5a}.b{color:#3b82f6}.g{color:#22d47a}.y{color:#f5c518}\n    p{color:#8b8fa8;line-height:1.7;margin-bottom:20px}\n    button{padding:10px 24px;border-radius:50px;border:none;background:linear-gradient(90deg,#ff3c5a,#3b82f6);color:#fff;font-weight:700;cursor:pointer;transition:.2s}\n    button:hover{transform:translateY(-2px)}\n  </style>\n</head>\n<body>\n  <div class="card">\n    <h1><span class="r">GA</span><span class="b">M</span><span class="g">UR</span><span class="y">A</span></h1>\n    <p>Built with BUBUBAI Compiler.<br>Code. Run. Conquer.</p>\n    <button onclick="this.textContent=\'\uD83C\uDFAE LAUNCHED!\'">&#128640; Launch Game</button>\n  </div>\n</body>\n</html>',
+        },
+
+        {
+          id: "css",
+          n: "CSS",
+          c: "#818cf8",
+          e: ".css",
+          code: "/* CSS - BUBUBAI Compiler */\nbody {\n  margin: 0;\n  min-height: 100vh;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  background: #0d0f17;\n  font-family: sans-serif;\n}\n.card {\n  width: 260px; padding: 40px; border-radius: 20px;\n  color: #fff; font-weight: 800; font-size: 1.4rem; text-align: center;\n  background: linear-gradient(135deg,#ff3c5a,#3b82f6,#22d47a,#f5c518);\n  background-size: 300% 300%;\n  animation: shift 4s ease infinite;\n  box-shadow: 0 20px 50px rgba(59,130,246,.4);\n}\n@keyframes shift {\n  0%,100%{background-position:0% 50%}\n  50%{background-position:100% 50%}\n}",
+        },
+
+        {
+          id: "python",
+          n: "Python",
+          c: "#3b82f6",
+          e: ".py",
+          code: '# Python 3 - BUBUBAI Compiler\nprint("Hello from BUBUBAI! \uD83C\uDFAE")\n\nprimes=[n for n in range(2,50) if all(n%i!=0 for i in range(2,int(n**0.5)+1))]\nprint(f"Primes < 50: {primes}")\n\ndef fib():\n    a,b=0,1\n    while True: yield a; a,b=b,a+b\n\ng=fib()\nprint("Fibonacci:",[next(g) for _ in range(10)])\n\nscores={"BuBuBaiRacer":9999,"Nexus":8500,"BuBuBai":7200}\nprint("\\nLeaderboard:")\nfor i,(k,v) in enumerate(sorted(scores.items(),key=lambda x:-x[1]),1):\n    print(f"  #{i} {k}: {v} pts")',
+        },
+
+        {
+          id: "java",
+          n: "Java",
+          c: "#ff3c5a",
+          e: ".java",
+          code: '// Java - BUBUBAI Compiler\nimport java.util.*;\nimport java.util.stream.*;\n\npublic class Main {\n    static boolean isPrime(int n){\n        return n>=2&&IntStream.rangeClosed(2,(int)Math.sqrt(n)).allMatch(i->n%i!=0);\n    }\n    public static void main(String[] args){\n        System.out.println("Hello from BUBUBAI! \uD83C\uDFAE");\n        var primes=IntStream.range(2,50).filter(Main::isPrime).boxed().collect(Collectors.toList());\n        System.out.println("Primes < 50: "+primes);\n        Map.of("BuBuBaiRacer",9999,"Nexus",8500,"BuBuBai",7200)\n           .entrySet().stream().sorted(Map.Entry.<String,Integer>comparingByValue().reversed())\n           .forEach(e->System.out.printf("  %-12s: %d%n",e.getKey(),e.getValue()));\n    }\n}',
+        },
+
+        {
+          id: "cpp",
+          n: "C++",
+          c: "#22d47a",
+          e: ".cpp",
+          code: '// C++ - BUBUBAI Compiler\n#include <iostream>\n#include <vector>\n#include <algorithm>\n#include <numeric>\nusing namespace std;\nint main(){\n    cout<<"Hello from BUBUBAI! \uD83C\uDFAE"<<endl;\n    vector<int> s={100,250,400,600,900,1200,1600};\n    cout<<"Total: "<<accumulate(s.begin(),s.end(),0)<<endl;\n    cout<<"Max:   "<<*max_element(s.begin(),s.end())<<endl;\n    transform(s.begin(),s.end(),s.begin(),[](int x){return x*2;});\n    cout<<"Doubled: "; for(auto x:s)cout<<x<<" "; cout<<endl;\n    return 0;\n}',
+        },
+
+        {
+          id: "c",
+          n: "C",
+          c: "#a855f7",
+          e: ".c",
+          code: '// C - BUBUBAI Compiler\n#include <stdio.h>\n#include <math.h>\nint factorial(int n){return n<=1?1:n*factorial(n-1);}\nint isPrime(int n){if(n<2)return 0;for(int i=2;i<=(int)sqrt(n);i++)if(n%i==0)return 0;return 1;}\nint main(){\n    printf("Hello from BUBUBAI!\\n\\n");\n    printf("Factorials:\\n");\n    for(int i=1;i<=10;i++)printf("  %2d! = %d\\n",i,factorial(i));\n    printf("\\nPrimes < 50: ");\n    for(int i=2;i<50;i++)if(isPrime(i))printf("%d ",i);\n    printf("\\n");\n    return 0;\n}',
+        },
+
+        {
+          id: "rust",
+          n: "Rust",
+          c: "#f59e0b",
+          e: ".rs",
+          code: '// Rust - BUBUBAI Compiler\nfn is_prime(n:u64)->bool{\n    if n<2{return false;}\n    for i in 2..=((n as f64).sqrt() as u64){if n%i==0{return false;}}\n    true\n}\nfn fibonacci(n:usize)->Vec<u64>{\n    let mut s=vec![0u64,1];\n    for i in 2..n{let x=s[i-1]+s[i-2];s.push(x);}\n    s[..n].to_vec()\n}\nfn main(){\n    println!("Hello from BUBUBAI! \uD83C\uDFAE");\n    let p:Vec<u64>=(2..50).filter(|&n|is_prime(n)).collect();\n    println!("Primes: {:?}",p);\n    println!("Fibonacci: {:?}",fibonacci(10));\n}',
+        },
+
+        {
+          id: "go",
+          n: "Go",
+          c: "#06b6d4",
+          e: ".go",
+          code: '// Go - BUBUBAI Compiler\npackage main\nimport("fmt";"math")\nfunc isPrime(n int)bool{\n    if n<2{return false}\n    for i:=2;i<=int(math.Sqrt(float64(n)));i++{if n%i==0{return false}}\n    return true\n}\nfunc fibonacci(n int)[]int{\n    s:=[]int{0,1}\n    for i:=2;i<n{s=append(s,s[i-1]+s[i-2]);i++}\n    return s[:n]\n}\nfunc main(){\n    fmt.Println("Hello from BUBUBAI! \uD83C\uDFAE")\n    var p []int\n    for i:=2;i<50;i++{if isPrime(i){p=append(p,i)}}\n    fmt.Println("Primes:",p)\n    fmt.Println("Fibonacci:",fibonacci(10))\n}',
+        },
+
+        {
+          id: "kotlin",
+          n: "Kotlin",
+          c: "#7c3aed",
+          e: ".kt",
+          code: '// Kotlin - BUBUBAI Compiler\ndata class Player(val name:String,val score:Int=0,val level:Int=1)\nfun Player.levelUp()=copy(level=level+1,score=score+level*100)\nfun isPrime(n:Int)=n>=2&&(2..Math.sqrt(n.toDouble()).toInt()).none{n%it==0}\nfun main(){\n    println("Hello from BUBUBAI! \uD83C\uDFAE")\n    var p=Player("BuBuBaiRacer")\n    repeat(6){p=p.levelUp();println("Level ${p.level} | Score: ${p.score}")}\n    println("\\nPrimes < 50: ${(2..49).filter{isPrime(it)}}")\n}',
+        },
+
+        {
+          id: "swift",
+          n: "Swift",
+          c: "#ff6b35",
+          e: ".swift",
+          code: '// Swift - BUBUBAI Compiler\nstruct Player{var name:String;var score:Int=0;var level:Int=1\n    mutating func up(){level+=1;score+=level*100}}\nfunc isPrime(_ n:Int)->Bool{guard n>=2 else{return false}\n    return !(2...Int(Double(n).squareRoot())).contains{n%$0==0}}\nprint("Hello from BUBUBAI! \uD83C\uDFAE")\nvar p=Player(name:"BuBuBaiRacer")\nfor _ in 1...6{p.up();print("Level \\(p.level) | Score: \\(p.score)")}\nlet primes=(2..<50).filter(isPrime)\nprint("\\nPrimes < 50: \\(primes)")',
+        },
+
+        {
+          id: "csharp",
+          n: "C#",
+          c: "#512bd4",
+          e: ".cs",
+          code: '// C# - BUBUBAI Compiler\nusing System;using System.Linq;\nclass Player{public string Name{get;set;}public int Score{get;set;}=0;public int Level{get;set;}=1;\n    public void LevelUp(){Level++;Score+=Level*100;}\n    public override string ToString()=>$"Level {Level} | Score: {Score}";}\nclass Program{static bool IsPrime(int n)=>n>=2&&Enumerable.Range(2,(int)Math.Sqrt(n)-1).All(i=>n%i!=0);\n    static void Main(){Console.WriteLine("Hello from BUBUBAI! \uD83C\uDFAE");\n        var p=new Player{Name="BuBuBaiRacer"};\n        for(int i=0;i<6;i++){p.LevelUp();Console.WriteLine(p);}\n        Console.WriteLine($"Primes < 50: {string.Join(", ",Enumerable.Range(2,48).Where(IsPrime))}");\n    }}',
+        },
+
+        {
+          id: "php",
+          n: "PHP",
+          c: "#8b5cf6",
+          e: ".php",
+          code: '<?php\n// PHP - BUBUBAI Compiler\necho "Hello from BUBUBAI! \uD83C\uDFAE\\n\\n";\nfunction greet(string $n):string{return "Welcome to BUBUBAI, {$n}!";}\necho greet("Developer")."\\n";\n$s=[100,250,400,600,900,1200];\necho "\\nLeaderboard:\\n";\nforeach($s as $i=>$v)echo "  Level ".($i+1).": {$v} pts\\n";\necho "Total: ".array_sum($s)."\\n";\n?>',
+        },
+
+        {
+          id: "ruby",
+          n: "Ruby",
+          c: "#f43f5e",
+          e: ".rb",
+          code: '# Ruby - BUBUBAI Compiler\nputs "Hello from BUBUBAI! \uD83C\uDFAE"\ndef prime?(n);return false if n<2;(2..Math.sqrt(n).to_i).none?{|i|n%i==0};end\nprimes=(2...50).select{|n|prime?(n)}\nputs "Primes: #{primes.inspect}"\nfib=Enumerator.new{|y|a,b=0,1;loop{y<<a;a,b=b,a+b}}\nputs "Fibonacci: #{fib.take(10).inspect}"',
+        },
+
+        {
+          id: "sql",
+          n: "SQL",
+          c: "#0ea5e9",
+          e: ".sql",
+          code: "-- SQL - BUBUBAI Compiler\nCREATE TABLE players(\n    id INTEGER PRIMARY KEY,\n    name TEXT NOT NULL,\n    score INTEGER DEFAULT 0,\n    level INTEGER DEFAULT 1\n);\nINSERT INTO players VALUES\n    (1,'BuBuBaiRacer',9999,42),\n    (2,'Nexus',8500,35),\n    (3,'BuBuBai',7200,28),\n    (4,'VeloDash',6100,22);\n\nSELECT name,score,level FROM players ORDER BY score DESC;\n\nSELECT COUNT(*) AS total_players, MAX(score) AS top_score,\n       AVG(score) AS avg_score FROM players;",
+        },
+
+        {
+          id: "bash",
+          n: "Bash",
+          c: "#84cc16",
+          e: ".sh",
+          code: '#!/bin/bash\n# Bash - BUBUBAI Compiler\necho "Hello from BUBUBAI! \uD83C\uDFAE"\ngreet(){ echo "Welcome to BUBUBAI, $1!"; }\ngreet "Developer"\necho ""\necho "=== Fibonacci ==="\na=0;b=1\nfor i in $(seq 1 10);do\n    printf "  fib(%2d) = %d\\n" $i $a\n    tmp=$b;b=$((a+b));a=$tmp\ndone\nscores=(100 250 400 600 900 1200)\ntotal=0;for s in "${scores[@]}";do total=$((total+s));done\necho "Total: $total"',
+        },
+
+        {
+          id: "lua",
+          n: "Lua",
+          c: "#000080",
+          e: ".lua",
+          code: '-- Lua - BUBUBAI Compiler\nprint("Hello from BUBUBAI! \uD83C\uDFAE")\nlocal function isPrime(n)\n    if n<2 then return false end\n    for i=2,math.floor(math.sqrt(n)) do if n%i==0 then return false end end\n    return true\nend\nlocal p={}\nfor n=2,49 do if isPrime(n) then table.insert(p,n) end end\nprint("Primes: "..table.concat(p,", "))\nlocal pl={name="BuBuBaiRacer",score=0,level=1}\nfunction pl:up() self.level=self.level+1;self.score=self.score+self.level*100 end\nfor i=1,5 do pl:up();print(("Level %d | Score: %d"):format(pl.level,pl.score)) end',
+        },
+
+        {
+          id: "haskell",
+          n: "Haskell",
+          c: "#5e5086",
+          e: ".hs",
+          code: '-- Haskell - BUBUBAI Compiler\nmodule Main where\nisPrime n=n>=2&&null[i|i<-[2..floor(sqrt(fromIntegral n))],n`mod`i==0]\nfibonacci=0:1:zipWith(+)fibonacci(tail fibonacci)\nfactorial 0=1;factorial n=n*factorial(n-1)\nmain=do\n  putStrLn "Hello from BUBUBAI! \uD83C\uDFAE"\n  print$filter isPrime[2..49]\n  print$take 10 fibonacci\n  mapM_(\\n->putStrLn$show n++"! = "++show(factorial n))[1..8]',
+        },
+
+        {
+          id: "r",
+          n: "R",
+          c: "#276dc3",
+          e: ".r",
+          code: '# R - BUBUBAI Compiler\ncat("Hello from BUBUBAI! \uD83C\uDFAE\\n\\n")\nscores<-c(100,250,400,600,900,1200,1600,2000)\ncat("Scores:",scores,"\\n")\ncat(sprintf("  Mean:   %.1f\\n",mean(scores)))\ncat(sprintf("  Median: %.1f\\n",median(scores)))\ncat(sprintf("  SD:     %.1f\\n",sd(scores)))\ncat(sprintf("  Total:  %d\\n\\n",sum(scores)))\nisPrime<-function(n){if(n<2)return(FALSE);all(n%%2:floor(sqrt(n))!=0)}\ncat("Primes < 50:",paste(Filter(isPrime,2:49),collapse=", "),"\\n")',
+        },
+
+        {
+          id: "scala",
+          n: "Scala",
+          c: "#dc322f",
+          e: ".scala",
+          code: '// Scala - BUBUBAI Compiler\nobject Main extends App{\n  def isPrime(n:Int)=n>=2&&(2 to math.sqrt(n).toInt).forall(n%_!=0)\n  println("Hello from BUBUBAI! \uD83C\uDFAE")\n  println(s"Primes < 50: ${(2 to 49).filter(isPrime)}")\n  val scores=List(100,250,400,600,900)\n  println(s"Total: ${scores.sum} | Max: ${scores.max}")\n}',
+        },
+
+        {
+          id: "perl",
+          n: "Perl",
+          c: "#39457e",
+          e: ".pl",
+          code: '#!/usr/bin/perl\n# Perl - BUBUBAI Compiler\nuse strict;use warnings;use POSIX qw(floor sqrt);\nsub isPrime{\n    my($n)=@_;return 0 if$n<2;\n    for my $i(2..floor(sqrt($n))){return 0 if$n%$i==0}\n    return 1;\n}\nprint "Hello from BUBUBAI!\\n";\nmy @p=grep{isPrime($_)}2..49;\nprint "Primes < 50: @p\\n";',
+        },
+
+        {
+          id: "dart",
+          n: "Dart",
+          c: "#00b4ab",
+          e: ".dart",
+          code: "// Dart - BUBUBAI Compiler\nimport 'dart:math';\nbool isPrime(int n){if(n<2)return false;for(int i=2;i<=sqrt(n.toDouble()).toInt();i++)if(n%i==0)return false;return true;}\nclass Player{String name;int score;int level;Player(this.name):score=0,level=1;void up(){level++;score+=level*100;}String toString()=>'Level \$level | Score: \$score';}\nvoid main(){\n  print('Hello from BUBUBAI! \uD83C\uDFAE');\n  var p=Player('BuBuBaiRacer');\n  for(int i=0;i<6;i++){p.up();print(p);}\n  print('\\nPrimes: \${List.generate(48,(i)=>i+2).where(isPrime).toList()}');\n}",
+        },
+
+        {
+          id: "julia",
+          n: "Julia",
+          c: "#9558b2",
+          e: ".jl",
+          code: '# Julia - BUBUBAI Compiler\nprintln("Hello from BUBUBAI! \uD83C\uDFAE")\nisPrime(n)=n>=2&&all(n%i!=0 for i in 2:isqrt(n))\nprimes=filter(isPrime,2:49)\nprintln("Primes < 50: ",collect(primes))\nscores=[100,250,400,600,900,1200]\nprintln("Sum: ",sum(scores),"  Max: ",maximum(scores))',
+        },
+
+        {
+          id: "powershell",
+          n: "PowerShell",
+          c: "#0078d4",
+          e: ".ps1",
+          code: '# PowerShell - BUBUBAI Compiler\nWrite-Host "Hello from BUBUBAI! \uD83C\uDFAE"\nfunction Get-Factorial($n){if($n-le 1){return 1};return $n*(Get-Factorial($n-1))}\nfunction Test-Prime($n){if($n-lt 2){return $false};for($i=2;$i-le[math]::Sqrt($n);$i++){if($n%$i-eq 0){return $false}};return $true}\nWrite-Host "\\nFactorials:"\n1..8|ForEach-Object{Write-Host "  $_! = $(Get-Factorial $_)"}\n$p=2..49|Where-Object{Test-Prime $_}\nWrite-Host "\\nPrimes < 50: $($p-join\', \')\"',
+        },
+
+        {
+          id: "cobol",
+          n: "COBOL",
+          c: "#3d85c8",
+          e: ".cob",
+          code: '       IDENTIFICATION DIVISION.\n       PROGRAM-ID. BUBUBAI.\n       DATA DIVISION.\n       WORKING-STORAGE SECTION.\n       01 WS-I    PIC 9(4) VALUE 1.\n       01 WS-F    PIC 9(18) VALUE 1.\n       PROCEDURE DIVISION.\n           DISPLAY "Hello from BUBUBAI!".\n           PERFORM VARYING WS-I FROM 1 BY 1 UNTIL WS-I > 8\n               MULTIPLY WS-I BY WS-F\n               DISPLAY WS-I "! = " WS-F\n           END-PERFORM.\n           STOP RUN.',
+        },
+      ];
+
+      var curLang = "javascript",
+        tabs = [],
+        activeTabId = null,
+        tabCtr = 0;
+      var fontSize = 13,
+        lineH = 21,
+        wrapOn = false,
+        lightMode = false;
+
+      document.addEventListener("DOMContentLoaded", function () {
+        buildSidebar();
+        createTab("javascript");
+        setupEditor();
+        setupResizer();
+        wireAll();
+      });
+
+      function buildSidebar() {
+        var list = document.getElementById("langList");
+        list.innerHTML = "";
+        LANGS.forEach(function (l) {
+          var el = document.createElement("div");
+          el.className = "li" + (l.id === curLang ? " on" : "");
+          el.dataset.id = l.id;
+          el.innerHTML =
+            '<div class="li-dot" style="background:' + l.c + '"></div>' + l.n;
+          el.addEventListener("click", function () {
+            switchLang(l.id);
+            closeMob();
+          });
+          list.appendChild(el);
+        });
+      }
+
+      function switchLang(id) {
+        var lang = LANGS.find(function (x) {
+          return x.id === id;
+        });
+        if (!lang) return;
+        curLang = id;
+        if (activeTabId !== null) {
+          var tab = tabs.find(function (t) {
+            return t.id === activeTabId;
+          });
+          if (tab) {
+            tab.lang = id;
+            tab.name = lang.n + lang.e;
+            tab.code = lang.code;
+            document.getElementById("ed").value = lang.code;
+          }
+        }
+        document.getElementById("etLang").textContent = lang.n;
+        document.getElementById("stLang").textContent = lang.n;
+        document.querySelectorAll(".li").forEach(function (el) {
+          el.classList.toggle("on", el.dataset.id === id);
+        });
+        renderTabs();
+        updateLN();
+        updateStatus();
+      }
+
+      function createTab(langId) {
+        var lang =
+          LANGS.find(function (l) {
+            return l.id === langId;
+          }) || LANGS[0];
+        var id = ++tabCtr;
+        var t = {
+          id: id,
+          lang: lang.id,
+          name: lang.n + lang.e,
+          code: lang.code,
+        };
+        tabs.push(t);
+        activateTab(id);
+        renderTabs();
+        return id;
+      }
+
+      function activateTab(id) {
+        if (activeTabId !== null) {
+          var prev = tabs.find(function (t) {
+            return t.id === activeTabId;
+          });
+          if (prev) prev.code = document.getElementById("ed").value;
+        }
+        var tab = tabs.find(function (t) {
+          return t.id === id;
+        });
+        if (!tab) return;
+        activeTabId = id;
+        curLang = tab.lang;
+        var lang = LANGS.find(function (l) {
+          return l.id === tab.lang;
+        });
+        document.getElementById("ed").value = tab.code;
+        document.getElementById("etLang").textContent = lang
+          ? lang.n
+          : tab.lang;
+        document.getElementById("stLang").textContent = lang
+          ? lang.n
+          : tab.lang;
+        document.querySelectorAll(".li").forEach(function (el) {
+          el.classList.toggle("on", el.dataset.id === curLang);
+        });
+        updateLN();
+        updateStatus();
+      }
+
+      function closeTab(id) {
+        var idx = tabs.findIndex(function (t) {
+          return t.id === id;
+        });
+        if (idx < 0) return;
+        tabs.splice(idx, 1);
+        if (!tabs.length) {
+          createTab("javascript");
+          return;
+        }
+        if (activeTabId === id)
+          activateTab(tabs[Math.min(idx, tabs.length - 1)].id);
+        renderTabs();
+      }
+
+      function renderTabs() {
+        var bar = document.getElementById("tabsBar");
+        bar.innerHTML = "";
+        tabs.forEach(function (t) {
+          var lang = LANGS.find(function (l) {
+            return l.id === t.lang;
+          });
+          var el = document.createElement("div");
+          el.className = "tab" + (t.id === activeTabId ? " on" : "");
+          el.innerHTML =
+            '<div class="tab-dot" style="background:' +
+            (lang ? lang.c : "#888") +
+            '"></div>' +
+            '<span style="max-width:88px;overflow:hidden;text-overflow:ellipsis">' +
+            t.name +
+            "</span>" +
+            '<div class="tab-x" data-id="' +
+            t.id +
+            '">&#x2715;</div>';
+          el.addEventListener("click", function (e) {
+            if (e.target.classList.contains("tab-x")) {
+              closeTab(+e.target.dataset.id);
+              return;
+            }
+            activateTab(t.id);
+            renderTabs();
+          });
+          bar.appendChild(el);
+        });
+        var add = document.createElement("div");
+        add.className = "tab-add";
+        add.textContent = "\uff0b";
+        add.addEventListener("click", function () {
+          createTab("javascript");
+        });
+        bar.appendChild(add);
+      }
+
+      function setupEditor() {
+        var ed = document.getElementById("ed");
+        ed.addEventListener("input", function () {
+          updateLN();
+          updateStatus();
+        });
+        ed.addEventListener("keydown", function (e) {
+          if (e.key === "Tab") {
+            e.preventDefault();
+            var s = ed.selectionStart,
+              end = ed.selectionEnd;
+            ed.value =
+              ed.value.substring(0, s) + "  " + ed.value.substring(end);
+            ed.selectionStart = ed.selectionEnd = s + 2;
+            updateLN();
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+            e.preventDefault();
+            runCode();
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+            e.preventDefault();
+            openSave();
+          }
+        });
+        ed.addEventListener("keyup", updateCursor);
+        ed.addEventListener("click", updateCursor);
+        ed.addEventListener("scroll", function () {
+          document.getElementById("lnum").style.top = "-" + ed.scrollTop + "px";
+        });
+      }
+
+      function updateCursor() {
+        var ed = document.getElementById("ed");
+        var lines = ed.value.substring(0, ed.selectionStart).split("\n");
+        document.getElementById("etPos").textContent =
+          "Ln " +
+          lines.length +
+          ", Col " +
+          (lines[lines.length - 1].length + 1);
+      }
+
+      function updateLN() {
+        var ed = document.getElementById("ed");
+        var n = (ed.value.match(/\n/g) || []).length + 1;
+        var s = "";
+        for (var i = 1; i <= n; i++) s += i + "\n";
+        document.getElementById("lnum").textContent = s;
+        updateStatus();
+      }
+
+      function updateStatus() {
+        var ed = document.getElementById("ed");
+        var n = (ed.value.match(/\n/g) || []).length + 1;
+        document.getElementById("stLines").textContent =
+          n + (n === 1 ? " line" : " lines");
+        document.getElementById("stChars").textContent =
+          ed.value.length + " chars";
+      }
+
+      function setStatus(msg, dot) {
+        document.getElementById("stMsg").textContent = msg;
+        var d = document.getElementById("stDot");
+        d.className = "sd" + (dot ? " " + dot : "");
+      }
+
+      /* RUN */
+      function runCode() {
+        var ed = document.getElementById("ed");
+        var code = ed.value.trim();
+        var rb = document.getElementById("runBtn");
+        var ob = document.getElementById("outBody");
+        if (!code) {
+          ob.innerHTML =
+            '<span class="ol er">&#9888;  Nothing to run. Write some code first.</span>';
+          return;
+        }
+
+        if (activeTabId !== null) {
+          var tab = tabs.find(function (t) {
+            return t.id === activeTabId;
+          });
+          if (tab) tab.code = ed.value;
+        }
+
+        rb.classList.add("running");
+        rb.innerHTML = '<div class="spin"></div> Running';
+        ob.innerHTML = '<span class="ol in">&#x23F3;  Executing\u2026</span>';
+        document.getElementById("execTime").textContent = "";
+        setStatus("Running\u2026", "y");
+
+        var t0 = performance.now();
+
+        function done() {
+          var ms = (performance.now() - t0).toFixed(0);
+          document.getElementById("execTime").textContent = ms + "ms";
+          rb.classList.remove("running");
+          rb.innerHTML =
+            '<svg viewBox="0 0 16 16" style="width:13px;height:13px;fill:#fff"><path d="M3 2l11 6-11 6z"/></svg> Run';
+          setStatus("Done", "");
+        }
+
+        if (curLang === "javascript" || curLang === "typescript") {
+          setTimeout(function () {
+            runJS(code, ob);
+            done();
+          }, 100);
+          return;
+        }
+        if (curLang === "html") {
+          var blob = new Blob([code], { type: "text/html" });
+          window.open(URL.createObjectURL(blob), "_blank");
+          ob.innerHTML =
+            '<span class="ol in">&#127760;  HTML preview opened in a new tab.</span>';
+          done();
+          return;
+        }
+        if (curLang === "css") {
+          var h =
+            "<!DOCTYPE html><html><head><style>" +
+            code +
+            '</style></head><body style="background:#0d0f17;margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh"><div class="card" style="font-family:sans-serif;color:#fff;padding:32px;border-radius:16px;background:rgba(255,255,255,.07);text-align:center">CSS Preview Active \u2713</div></body></html>';
+          window.open(
+            URL.createObjectURL(new Blob([h], { type: "text/html" })),
+            "_blank",
+          );
+          ob.innerHTML =
+            '<span class="ol in">&#127912;  CSS preview opened in a new tab.</span>';
+          done();
+          return;
+        }
+        showGuide(code, curLang, ob);
+        done();
+      }
+
+      function runJS(code, ob) {
+        var logs = [];
+        var fc = {
+          log: function () {
+            logs.push({ t: "ok", v: Array.from(arguments).map(fmt).join(" ") });
+          },
+          error: function () {
+            logs.push({
+              t: "er",
+              v: Array.from(arguments).map(String).join(" "),
+            });
+          },
+          warn: function () {
+            logs.push({
+              t: "wa",
+              v: Array.from(arguments).map(String).join(" "),
+            });
+          },
+          info: function () {
+            logs.push({ t: "in", v: Array.from(arguments).map(fmt).join(" ") });
+          },
+          table: function (d) {
+            logs.push({ t: "ok", v: JSON.stringify(d, null, 2) });
+          },
+        };
+        try {
+          new Function("console", code)(fc);
+          ob.innerHTML = "";
+          if (!logs.length) {
+            ob.innerHTML =
+              '<span class="ol in">&#10003;  Executed \u2014 no output.</span>';
+            return;
+          }
+          logs.forEach(function (l) {
+            var el = document.createElement("span");
+            el.className = "ol " + l.t;
+            el.textContent = l.v;
+            ob.appendChild(el);
+          });
+        } catch (e) {
+          ob.innerHTML =
+            '<span class="ol er">&#10060;  ' +
+            e.constructor.name +
+            ": " +
+            e.message +
+            "</span>";
+        }
+      }
+
+      function showGuide(code, lang, ob) {
+        var lname =
+          (
+            LANGS.find(function (l) {
+              return l.id === lang;
+            }) || {}
+          ).n || lang;
+        var lines = code.split("\n");
+        var guides = {
+          python: "python3 main.py",
+          java: "javac Main.java && java Main",
+          cpp: "g++ main.cpp -o main && ./main",
+          c: "gcc main.c -o main -lm && ./main",
+          rust: "rustc main.rs && ./main  (or: cargo run)",
+          go: "go run main.go",
+          kotlin:
+            "kotlinc main.kt -include-runtime -d a.jar && java -jar a.jar",
+          swift: "swift main.swift",
+          csharp: "dotnet run",
+          php: "php main.php",
+          ruby: "ruby main.rb",
+          bash: "bash main.sh",
+          sql: "sqlite3 :memory: < main.sql",
+          typescript: "npx ts-node main.ts  (or: tsc main.ts && node main.js)",
+          r: "Rscript main.r",
+          lua: "lua main.lua",
+          perl: "perl main.pl",
+          dart: "dart run main.dart",
+          scala: "scala main.scala",
+          haskell: "runhaskell main.hs",
+          julia: "julia main.jl",
+          powershell: "pwsh main.ps1",
+          cobol: "cobc -x main.cob && ./main",
+        };
+        var cmd =
+          guides[lang] || "Run with a " + lname + " compiler or interpreter";
+        var preview = lines
+          .slice(0, 5)
+          .map(function (l) {
+            var el = document.createElement("span");
+            el.className = "ol ok";
+            el.textContent = l;
+            return el.outerHTML;
+          })
+          .join("");
+        var more =
+          lines.length > 5
+            ? '<span class="ol dim">\u2026 ' +
+              (lines.length - 5) +
+              " more lines</span>"
+            : "";
+        ob.innerHTML =
+          '<span class="ol in">&#128203;  ' +
+          lname +
+          " \u2014 " +
+          lines.length +
+          " lines, " +
+          code.length +
+          " chars</span>" +
+          '<span class="ol dim" style="display:block;margin-top:8px">&#9472;&#9472; Code Preview &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</span>' +
+          preview +
+          more +
+          '<span class="ol dim" style="display:block;margin-top:10px">&#9472;&#9472; Run This Code &#9472;&#9472;&#9472;&#9472;&#9472;</span>' +
+          '<span class="ol wa">$ ' +
+          cmd +
+          "</span>" +
+          '<span class="ol in" style="display:block;margin-top:6px">&#128161; Run online free: replit.com \u2022 ideone.com \u2022 onecompiler.com</span>';
+      }
+
+      function fmt(x) {
+        if (x === null) return "null";
+        if (x === undefined) return "undefined";
+        if (typeof x === "object") {
+          try {
+            return JSON.stringify(x, null, 2);
+          } catch (e) {
+            return String(x);
+          }
+        }
+        return String(x);
+      }
+
+      /* RESIZER */
+      function setupResizer() {
+        var rsz = document.getElementById("rsz");
+        var out = document.getElementById("outPanel");
+        var drag = false,
+          sy = 0,
+          sh = 0;
+        function start(y) {
+          drag = true;
+          sy = y;
+          sh = out.offsetHeight;
+          rsz.classList.add("drag");
+          document.body.style.userSelect = "none";
+        }
+        function move(y) {
+          if (!drag) return;
+          out.style.height =
+            Math.max(60, Math.min(window.innerHeight * 0.55, sh + sy - y)) +
+            "px";
+        }
+        function end() {
+          drag = false;
+          rsz.classList.remove("drag");
+          document.body.style.userSelect = "";
+        }
+        rsz.addEventListener("mousedown", function (e) {
+          start(e.clientY);
+        });
+        document.addEventListener("mousemove", function (e) {
+          move(e.clientY);
+        });
+        document.addEventListener("mouseup", end);
+        rsz.addEventListener(
+          "touchstart",
+          function (e) {
+            start(e.touches[0].clientY);
+          },
+          { passive: true },
+        );
+        document.addEventListener(
+          "touchmove",
+          function (e) {
+            if (drag) {
+              e.preventDefault();
+              move(e.touches[0].clientY);
+            }
+          },
+          { passive: false },
+        );
+        document.addEventListener("touchend", end);
+      }
+
+      /* SAVE / SHARE / THEME */
+      function openSave() {
+        var lang = LANGS.find(function (l) {
+          return l.id === curLang;
+        });
+        document.getElementById("saveName").value =
+          "main" + (lang ? lang.e : ".txt");
+        document.getElementById("saveModal").classList.add("open");
+      }
+      function doSave() {
+        var name = document.getElementById("saveName").value || "main.txt";
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(
+          new Blob([document.getElementById("ed").value], {
+            type: "text/plain",
+          }),
+        );
+        a.download = name;
+        a.click();
+        document.getElementById("saveModal").classList.remove("open");
+      }
+      function openShare() {
+        var code = encodeURIComponent(
+          document.getElementById("ed").value,
+        ).substring(0, 180);
+        document.getElementById("shareLink").value =
+          "#/compiler?lang=" + curLang + "&code=" + code + "...";
+        document.getElementById("shareModal").classList.add("open");
+      }
+      function copyShare() {
+        var inp = document.getElementById("shareLink");
+        inp.select();
+        try {
+          navigator.clipboard.writeText(inp.value);
+        } catch (e) {}
+        var btn = document.getElementById("shareCopyBtn");
+        btn.textContent = "\u2713 Copied!";
+        setTimeout(function () {
+          btn.textContent = "Copy Link";
+        }, 2500);
+      }
+      function toggleTheme() {
+        lightMode = !lightMode;
+        var r = document.documentElement;
+        if (lightMode) {
+          r.style.setProperty("--bg", "#f0f3ff");
+          r.style.setProperty("--sf", "#ffffff");
+          r.style.setProperty("--sf2", "#f5f7ff");
+          r.style.setProperty("--sf3", "#ebeef8");
+          r.style.setProperty("--b1", "#dde1f0");
+          r.style.setProperty("--b2", "#c8cde0");
+          r.style.setProperty("--tx", "#1a1e35");
+          r.style.setProperty("--tx2", "#454870");
+          r.style.setProperty("--tx3", "#8890b0");
+          document.getElementById("themeBtn").textContent = "\uD83C\uDF19 Dark";
+        } else {
+          r.style.setProperty("--bg", "#0d0f17");
+          r.style.setProperty("--sf", "#141720");
+          r.style.setProperty("--sf2", "#1a1d2e");
+          r.style.setProperty("--sf3", "#1f2235");
+          r.style.setProperty("--b1", "#2a2d3e");
+          r.style.setProperty("--b2", "#353850");
+          r.style.setProperty("--tx", "#e8eaf6");
+          r.style.setProperty("--tx2", "#8b8fa8");
+          r.style.setProperty("--tx3", "#555870");
+          document.getElementById("themeBtn").textContent = "\u2600 Light";
+        }
+      }
+
+      /* MOBILE */
+      function closeMob() {
+        document.getElementById("sidebar").classList.remove("mob");
+        document.getElementById("mbd").classList.remove("open");
+      }
+      function toggleMobSidebar() {
+        var sb = document.getElementById("sidebar");
+        if (sb.classList.contains("mob")) {
+          closeMob();
+        } else {
+          sb.classList.add("mob");
+          document.getElementById("mbd").classList.add("open");
+        }
+      }
+
+      /* WIRE */
+      function wireAll() {
+        document.getElementById("runBtn").addEventListener("click", runCode);
+        document
+          .getElementById("newBtn")
+          .addEventListener("click", function () {
+            createTab("javascript");
+          });
+        document.getElementById("saveBtn").addEventListener("click", openSave);
+        document.getElementById("saveOkBtn").addEventListener("click", doSave);
+        document
+          .getElementById("saveCancelBtn")
+          .addEventListener("click", function () {
+            document.getElementById("saveModal").classList.remove("open");
+          });
+        document
+          .getElementById("shareBtn")
+          .addEventListener("click", openShare);
+        document
+          .getElementById("shareCopyBtn")
+          .addEventListener("click", copyShare);
+        document
+          .getElementById("shareCancelBtn")
+          .addEventListener("click", function () {
+            document.getElementById("shareModal").classList.remove("open");
+          });
+        document
+          .getElementById("themeBtn")
+          .addEventListener("click", toggleTheme);
+        document.getElementById("sbBtn").addEventListener("click", function () {
+          if (window.innerWidth > 768)
+            document.getElementById("sidebar").classList.toggle("off");
+          else toggleMobSidebar();
+        });
+        document
+          .getElementById("clrBtn")
+          .addEventListener("click", function () {
+            document.getElementById("outBody").innerHTML =
+              '<span class="ol ph">Output cleared. Ready.</span>';
+            document.getElementById("execTime").textContent = "";
+            setStatus("Ready", "");
+          });
+        document.getElementById("fmBtn").addEventListener("click", function () {
+          fontSize = Math.max(10, fontSize - 1);
+          lineH = Math.round(fontSize * 1.63);
+          applyFont();
+        });
+        document.getElementById("fpBtn").addEventListener("click", function () {
+          fontSize = Math.min(22, fontSize + 1);
+          lineH = Math.round(fontSize * 1.63);
+          applyFont();
+        });
+        document
+          .getElementById("wrapBtn")
+          .addEventListener("click", function () {
+            wrapOn = !wrapOn;
+            document.getElementById("ed").style.whiteSpace = wrapOn
+              ? "pre-wrap"
+              : "pre";
+            document.getElementById("wrapBtn").classList.toggle("on", wrapOn);
+          });
+        document.getElementById("ntBtn").addEventListener("click", function () {
+          createTab(curLang);
+        });
+        document.querySelectorAll(".otab").forEach(function (t) {
+          t.addEventListener("click", function () {
+            document.querySelectorAll(".otab").forEach(function (x) {
+              x.classList.remove("on");
+            });
+            t.classList.add("on");
+          });
+        });
+        document.querySelectorAll(".ov").forEach(function (o) {
+          o.addEventListener("click", function (e) {
+            if (e.target === o) o.classList.remove("open");
+          });
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape")
+            document.querySelectorAll(".ov.open").forEach(function (o) {
+              o.classList.remove("open");
+            });
+        });
+        document
+          .getElementById("mLangs")
+          .addEventListener("click", toggleMobSidebar);
+        document.getElementById("mSave").addEventListener("click", openSave);
+        document.getElementById("mRun").addEventListener("click", runCode);
+        document
+          .getElementById("mTheme")
+          .addEventListener("click", toggleTheme);
+        document.getElementById("mShare").addEventListener("click", openShare);
+        document.getElementById("mbd").addEventListener("click", closeMob);
+      }
+
+      function applyFont() {
+        var ed = document.getElementById("ed");
+        var ln = document.getElementById("lnum");
+        ed.style.fontSize = fontSize + "px";
+        ed.style.lineHeight = lineH + "px";
+        ln.style.fontSize = fontSize + "px";
+        ln.style.lineHeight = lineH + "px";
+      }
+    </script>
+  </body>
+</html>

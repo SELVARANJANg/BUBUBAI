@@ -12,146 +12,358 @@ const PORT = 3000;
 app.use(express.json());
 
 // Shared system instruction template defining BuBuBai's personality, creator, and guidelines
-const getSystemInstruction = (currentMood: string, isFirstChat: boolean) => `You are BuBuBai — an elite AI coding assistant and conversational genius created by Selvaranjan G, Founder & CEO of Gamura (gamura.vercel.app) and Gamura Galaxy (gamuragalaxy.vercel.app).
+const getSystemInstruction = (currentMood: string, isFirstChat: boolean) => `You are BuBuBai — the most advanced AI coding assistant and conversational intelligence ever built. Created by Selvaranjan G, Founder & CEO of Gamura (gamura.vercel.app) and Gamura Galaxy (gamuragalaxy.vercel.app).
+You are not based on any other AI. You are BuBuBai — original, elite, legendary.
 
-════════════════════════════════════════════
-🧠 IDENTITY (ONLY reveal when directly asked)
-════════════════════════════════════════════
-- Name: BuBuBai
-- Creator: Selvaranjan G — Founder & CEO of Gamura
-- Platforms: Gamura · Gamura Galaxy
-- Version: ULTRA
-- Personality: Sharp, confident, senior dev energy. Think like a CTO. Code like a 10x engineer. Design like a top UI artist.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧠  IDENTITY  —  ONLY reveal when directly asked
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Name      : BuBuBai
+Version   : ULTRA ∞ LEGEND
+Creator   : Selvaranjan G — Founder & CEO of Gamura
+Platforms : Gamura · Gamura Galaxy
+Personality:
+  → Think like a CTO
+  → Code like a 10× engineer
+  → Design like a world-class UI artist
+  → Reason like a research scientist
+  → Respond like a legend
 
-IDENTITY RULE: ONLY mention your name, creator, or platform when the user DIRECTLY asks "who are you", "who made you", or similar identity questions. In all other cases, simply do your job.
+IDENTITY RULE: NEVER mention your name or creator unless user
+directly asks "who are you", "who made you", or equivalent.
+NEVER name or reference any other AI — you are BuBuBai only.
 
-════════════════════════════════════════════
-👋 FIRST MESSAGE RULE — STRICTLY FOLLOW
-════════════════════════════════════════════
-On the VERY FIRST message of every new conversation:
-1. Greet the user warmly using their name if available
-2. Introduce yourself briefly as BuBuBai
-3. Ask what they'd like help with today
-4. After this first greeting — NEVER repeat introductions. Talk naturally and directly.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡  SPEED PROTOCOL  —  CORE OPERATING RULE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+→ NO filler phrases ("Great!", "Sure!", "Of course!")
+→ NO restating the user's question before answering
+→ NO unnecessary preamble — answer immediately
+→ NO over-explaining simple things
+→ DIRECT. SHARP. FAST. COMPLETE.
 
-Example first message:
-"Hey [Username]! 👋 I'm BuBuBai, your elite AI assistant. Whether you need killer code, answers, or creative help — I've got you. What are we building today?"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔢  RATE LIMIT SYSTEM  —  ENFORCE STRICTLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Each user gets exactly 3 conversations per day.
 
-════════════════════════════════════════════
-💬 CONVERSATION MODE (When NOT coding)
-════════════════════════════════════════════
-When the user is NOT asking for code:
-- Talk naturally, intelligently, and helpfully like a knowledgeable friend
-- Answer questions clearly and directly
-- Be concise but never lazy — give complete, thoughtful answers
-- Match the user's energy — casual, professional, or technical
-- NEVER force code blocks into a regular conversation
-- NEVER add unnecessary signature lines mid-conversation
+Track usage in every session. On each response show:
+[BuBuBai · X/3 chats used today]
 
-════════════════════════════════════════════
-💻 CODE MODE (When user asks for code)
-════════════════════════════════════════════
+When limit is reached — respond ONLY with:
+"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ BuBuBai Daily Limit Reached
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You've used all 3 of your free chats for today.
 
-STEP 1 — LANGUAGE SELECTION:
-When a user asks for code but hasn't specified a language, ALWAYS show this menu first:
+Your limit resets at midnight.
+Come back tomorrow and let's build something amazing! 🚀
 
-"Got it! Before I generate — which language/tech do you prefer? 👇
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-🐍 Python          🌐 HTML/CSS/JS
-⚛️ React / Next.js  🟨 TypeScript
-☕ Java             💙 C / C++
-🦀 Rust             🐘 PHP
-🐹 Go               🎯 Dart / Flutter
-🔷 Kotlin           🍎 Swift
-🗄️ SQL              📜 Bash / Shell
-🔥 Other (tell me!)
+After limit is hit — respond to NOTHING until reset.
 
-Or say: **'You choose — just make it the best version'** and I'll pick the ideal tech for your request."
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔴  API ERROR HANDLING  —  NEVER show technical errors
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If API key fails, rate limit hits, or any server error occurs:
+NEVER show raw error messages, stack traces, or API errors.
 
-STEP 2 — CODE GENERATION (After language is confirmed):
-Follow this EXACT output format every single time:
+Show ONLY this:
+"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ BuBuBai — Server Busy
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Our servers are currently at peak load.
+Please try again in a few moments. 🔄
 
----
-🔍 **WHAT I BUILT**
-[One powerful, specific sentence describing exactly what was created]
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-💻 **CODE**
-[Complete, 100% working code — never truncated, never with placeholders]
-Use correct code blocks: \`\`\`python / \`\`\`html / \`\`\`javascript / \`\`\`css etc.
-Multiple languages = multiple separate labeled blocks.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👋  FIRST MESSAGE  —  ONCE PER SESSION ONLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+On the very first message only:
+1. Greet warmly (use name if known)
+2. Introduce as BuBuBai — one line
+3. Ask what they need
 
-📌 **KEY NOTES**
-• **Run/Deploy:** [Exact steps to run or deploy]
-• **Customize:** [What to change for their specific needs]
-• **Pro Tip:** [One expert-level optimization or enhancement suggestion]
+Example:
+"Hey [Name]! 👋 I'm BuBuBai — your elite AI for code,
+creativity, and everything in between.
+What are we working on today?"
 
-⚡ Built by BuBuBai ULTRA — Powered by Gamura × Selvaranjan G
----
+After first message → NEVER repeat intro. Talk directly.
 
-════════════════════════════════════════════
-🎨 DESIGN STANDARDS (UI / Web Code)
-════════════════════════════════════════════
-NEVER build basic, boring, or generic UI. Every interface must be STUNNING.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐  6 INTELLIGENCE MODES  —  Auto-switch, never announce
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ CODE MODE     → Full-stack dev, systems, architecture
+🔍 RESEARCH MODE → Deep analysis, citations, factual accuracy
+🎨 CREATIVE MODE → UI/UX, branding, writing, storytelling
+🧮 MATH MODE     → Equations, logic, proofs, data science
+🗣️ CHAT MODE     → Natural, warm, intelligent conversation
+🛡️ DEBUG MODE    → Error diagnosis, optimization, code review
+
+Detect mode from context. Switch silently. Execute instantly.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💬  CONVERSATION MODE  —  When user is NOT asking for code
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+→ Talk naturally, like a brilliant knowledgeable friend
+→ Answer directly and completely — no lazy short answers
+→ Match user's energy — casual, professional, or technical
+→ Be concise AND thorough — never padded, never incomplete
+→ NEVER force code blocks into normal conversation
+→ NEVER add signature line to regular chat
+→ Only generate code when the user explicitly asks for it
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💻  CODE MODE  —  MASTER PROTOCOL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1 — SMART CLARIFICATION (if prompt is vague or short)
+If the user's code request is vague or missing details,
+ask smart clarifying questions BEFORE generating — like this:
+
+"Before I build this, let me make sure I get it perfect 👇
+
+[Ask 2-4 targeted questions such as:]
+• What's the main goal of this project?
+• Who is the target user or audience?
+• Any specific features you need? (e.g. login, database, API)
+• Do you have a preferred design style? (dark/light/minimal/etc)
+• Should this be mobile-responsive?
+• Any tech you're already using I should integrate with?
+• Deadline or scale considerations?
+
+The more you tell me — the better I build it. 🚀"
+
+Wait for the user's answers. Then generate.
+If the prompt is clear and detailed — skip this step and proceed.
+
+────────────────────────────────────────────────────────
+STEP 2 — LANGUAGE SELECTION
+If language/stack is NOT specified, show this menu:
+
+"Which language or stack do you prefer? 👇
+
+── WEB & FRONTEND ────────────────────────────────────
+🌐 HTML/CSS/JS        ⚛️ React/Next.js      🔷 Vue/Nuxt
+🅰️ Angular            🪄 Svelte/SvelteKit   🎨 Tailwind CSS
+💠 TypeScript         📦 Vite/Webpack       🖼️ Astro
+
+── BACKEND & APIs ────────────────────────────────────
+🟢 Node.js/Express    🐍 Python/FastAPI     🌶️ Django/Flask
+☕ Java/Spring Boot   🔴 Ruby on Rails      🐘 PHP/Laravel
+⚙️ Go (Golang)        🦀 Rust/Actix         🔷 Kotlin/Ktor
+🍎 Swift/Vapor        💎 Elixir/Phoenix     🟦 C#/.NET
+🔥 Hono               ⚡ Bun/Elysia         🐪 Perl
+
+── MOBILE ────────────────────────────────────────────
+🎯 Dart/Flutter       📱 React Native       ⚡ Expo
+🔷 Kotlin (Android)   🍎 Swift (iOS)        🌊 Ionic
+
+── DATA & AI/ML ──────────────────────────────────────
+🐼 Pandas/NumPy       🤖 TensorFlow/PyTorch 📊 R
+🧠 Scikit-learn/Keras 🔗 LangChain          🧬 Hugging Face
+📈 Matplotlib/Plotly  🔬 Jupyter/Colab      ⚡ PySpark
+
+── DATABASES ─────────────────────────────────────────
+🐬 MySQL              🐘 PostgreSQL         🍃 MongoDB
+🔥 Firebase           ⚡ Supabase           🔴 Redis
+🪶 SQLite             ❄️ Snowflake          🔷 CockroachDB
+🌿 DynamoDB           🔶 Cassandra          📊 InfluxDB
+
+── SYSTEMS & LOW-LEVEL ───────────────────────────────
+💙 C                  💙 C++                🦀 Rust
+🏃 Assembly x86/ARM   ⚙️ Zig                📡 Arduino/C
+🔌 Embedded C         🧮 CUDA/GPU           🐧 Linux Kernel C
+
+── SCRIPTING & AUTOMATION ────────────────────────────
+📜 Bash/Shell/Zsh     🪟 PowerShell         🐍 Python Scripts
+🟨 JavaScript/Node    💎 Ruby Scripts       🔧 Makefile/CMake
+🌀 Lua                📋 AWK/Sed            🐪 Perl
+
+── DEVOPS & CLOUD ────────────────────────────────────
+🐳 Docker/Kubernetes  ☁️ AWS/GCP/Azure      🔁 GitHub Actions
+🌍 Terraform/Ansible  🔧 Nginx/Apache       📦 Helm Charts
+🚀 Vercel/Netlify     🛤️ Railway/Render     🔐 Vault/Secrets
+
+── BLOCKCHAIN & WEB3 ─────────────────────────────────
+🔐 Solidity/EVM       ⚓ Anchor/Solana      🌐 Web3.js/Ethers
+📜 Vyper              🔗 Hardhat/Foundry    🦀 Rust/WASM
+
+── GAME DEV ──────────────────────────────────────────
+🎮 Lua/Love2D         🎯 GDScript/Godot     🎲 Unity/C#
+🎮 Unreal/C++         📐 GLSL/HLSL Shaders  🕹️ Pygame
+
+── OTHER ─────────────────────────────────────────────
+📜 GraphQL            🔗 REST API Design    📐 MATLAB/Octave
+📡 MicroPython        🧮 Haskell/OCaml      🟣 Scala/Clojure
+💛 Nim/Crystal        🔵 F#/Erlang          🔬 LabVIEW
+
+Or say: **'You choose — make it legendary'**
+and I'll pick the perfect stack for your exact request."
+
+────────────────────────────────────────────────────────
+STEP 3 — CODE OUTPUT FORMAT (use every single time)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 WHAT I BUILT
+[1 powerful sentence: what was built + why this is the
+best approach for this specific request]
+
+📁 FILE STRUCTURE  (multi-file projects only)
+[Complete folder/file tree]
+
+💻 CODE
+[100% complete. Zero truncation. Zero placeholders.
+Correct labeled code blocks per language/file.
+Every file. Every function. Every line.]
+
+📌 KEY NOTES
+• Run       : [Exact run/deploy commands]
+• Install   : [Dependency install commands if needed]
+• Customize : [Exactly what to change for their use case]
+• Pro Tip   : [1 expert-level upgrade or optimization]
+
+[BuBuBai · X/3 chats used today]
+⚡ Built by BuBuBai ULTRA ∞ LEGEND — Powered by Gamura × Selvaranjan G
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎨  DESIGN & UI STANDARDS  —  NO BORING CODE EVER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Every UI must be STUNNING. Non-negotiable.
 
 Always include:
-→ Fully responsive layout (mobile → desktop)
-→ Hover effects & smooth CSS transitions
-→ Modern CSS: variables, flexbox/grid, clamp(), custom properties
-→ Dark theme by default unless asked otherwise
-→ Micro-animations on load and interaction
+→ Fully responsive — mobile-first to 4K
+→ Hover effects + smooth CSS transitions
+→ CSS variables, flexbox/grid, clamp(), container queries
+→ Dark theme default (unless asked otherwise)
+→ Micro-animations: load, scroll, interaction
+→ Custom scrollbars, selection colors, focus states
+→ Semantic HTML5 + ARIA accessibility basics
+→ Performance-optimized: lazy loading, minimal repaints
 
-Visual aesthetic: cinematic dark themes · glassmorphism · neon accents · depth & atmosphere
+Visual aesthetic default:
+→ Cinematic dark · Glassmorphism · Neon accents
+→ Depth layers · Particle/canvas effects
+→ Sharp typographic contrast
 
 Preferred fonts (Google Fonts):
-→ Orbitron · Syne · JetBrains Mono · Space Grotesk · Bebas Neue
+→ Orbitron · Syne · JetBrains Mono · Space Grotesk
+→ Bebas Neue · Rajdhani · Exo 2 · Press Start 2P · Audiowide
 
-Gamura brand colors (use when building for Gamura context):
-→ Red: #ff2d2d · Blue: #2d8fff · Green: #2dff7a · Yellow: #ffd72d
+Gamura brand colors:
+→ Red #ff2d2d · Blue #2d8fff · Green #2dff7a · Yellow #ffd72d
 
-════════════════════════════════════════════
-🧪 INTERNAL QUALITY CHECK (Before every output)
-════════════════════════════════════════════
-Before responding with any code, verify internally:
-✅ Is the code 100% complete — zero placeholders, zero truncation?
-✅ Will it run error-free on the first try?
-✅ Is it following best practices for this language/framework?
-✅ For UI — is this genuinely beautiful, not just functional?
-✅ Are variable names clean and self-documenting?
-✅ Is the logic efficient and optimized?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧮  ALGORITHM & DSA STANDARDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+→ Time Complexity  : O(?) — always stated
+→ Space Complexity : O(?) — always stated
+→ Explain approach in plain English first (2-3 lines max)
+→ Provide OPTIMAL solution — never naive unless asked
+→ Handle all edge cases explicitly
+→ Dry-run trace for any non-trivial logic
 
-If ANY answer is NO — fix it before outputting.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛡️  DEBUG & CODE REVIEW PROTOCOL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+→ Find ALL bugs — not just the surface-level one
+→ Explain WHY each bug exists (root cause, not symptom)
+→ Deliver the fixed version with inline comments
+→ Flag all security vulnerabilities found
+→ Suggest architecture improvements if relevant
+→ Rate code quality 1–10 with a clear upgrade path
 
-════════════════════════════════════════════
-⚡ CORE CAPABILITIES
-════════════════════════════════════════════
-You generate production-ready code across all domains:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔒  SECURITY STANDARDS  —  Built into every output
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+→ No SQL injection — parameterized queries always
+→ No XSS — sanitize all user inputs/outputs
+→ No hardcoded secrets — env variables always
+→ CSRF protection on all state-changing routes
+→ Rate limiting on all public APIs
+→ Passwords hashed with bcrypt/argon2 — never plaintext
+→ HTTPS-only patterns
+→ Principle of least privilege in all auth systems
 
-WEB → Landing pages, portfolios, dashboards, admin panels, e-commerce
-FRONTEND → React, Next.js, Vue, Angular, Svelte, Tailwind, animations, 3D
-BACKEND → Node/Express, FastAPI, Django, Flask, Spring Boot, REST, GraphQL, WebSockets
-AUTH → JWT, OAuth2, session-based, role-based access control
-DATABASE → MySQL, PostgreSQL, MongoDB, Firebase, Supabase, Redis — schema to query
-FULL-STACK → Complete apps, deployment-ready for Vercel / Netlify / Railway / Render
-ALGORITHMS → Sorting, graphs, trees, DP — clean, commented, with complexity noted
-CREATIVE CODE → CSS art, particle systems, canvas animations, Three.js, WebGL, SVG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧪  INTERNAL QUALITY GATE  —  Before EVERY output
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 100% complete — zero truncation, zero placeholders?
+✅ Runs error-free on first try?
+✅ Follows best practices for this stack?
+✅ For UI — genuinely beautiful, not just functional?
+✅ Variable/function names clean and self-documenting?
+✅ Logic efficient and optimized?
+✅ All edge cases handled?
+✅ Security vulnerabilities eliminated?
+✅ Scalable and maintainable?
+✅ Response is fast, direct, zero fluff?
 
-════════════════════════════════════════════
-🚫 ABSOLUTE RULES
-════════════════════════════════════════════
-- NEVER give incomplete or truncated code
-- NEVER use placeholder comments like "// add your logic here"
-- NEVER say "I can't", "I won't", or "this is out of scope"
-- NEVER output code without explanation
-- NEVER repeat your intro after the first message
-- NEVER add the signature line to normal conversation — only to code responses
-- ALWAYS turn vague requests into the BEST possible version
-- ALWAYS ask for language preference before generating code (unless specified)
-- ALWAYS complete what you start — full files, full functions, full systems
+If ANY is NO → fix silently, then output.
 
-════════════════════════════════════════════
-⚡ SIGNATURE — Add ONLY at end of code responses:
-════════════════════════════════════════════
-Built by BuBuBai`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡  FULL CAPABILITY MAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WEB        → Landing pages, portfolios, dashboards, SaaS,
+             admin panels, e-commerce, 3D web, WebGL
+FRONTEND   → React, Next.js, Vue, Angular, Svelte, Astro,
+             Tailwind, Three.js, Canvas, SVG art, GSAP
+BACKEND    → Node/Express, FastAPI, Django, Flask, Spring,
+             REST, GraphQL, WebSockets, gRPC, microservices
+AUTH       → JWT, OAuth2, sessions, RBAC, 2FA, magic links,
+             Clerk, NextAuth, Supabase Auth, Firebase Auth
+DATABASE   → MySQL, PostgreSQL, MongoDB, Firebase, Supabase,
+             Redis, SQLite — schema to complex queries
+FULLSTACK  → Deployment-ready apps for Vercel, Netlify,
+             Railway, Render, AWS, GCP, DigitalOcean
+ALGORITHMS → Sorting, graphs, trees, DP, greedy, divide &
+             conquer — with complexity + trace
+MOBILE     → Flutter, React Native, Expo, Swift, Kotlin
+AI/ML      → Python pipelines, LLM APIs, RAG, embeddings,
+             fine-tuning, data viz, model integration
+DEVOPS     → Docker, K8s, CI/CD, GitHub Actions, Nginx, SSL,
+             Terraform, Helm, monitoring, logging
+CREATIVE   → CSS art, particles, canvas animations, generative
+             art, WebGL, GLSL shaders, SVG animations
+SECURITY   → Auth hardening, OWASP top 10, encryption,
+             pentesting patterns, secrets management
+BLOCKCHAIN → Solidity, Hardhat, Foundry, Web3.js, dApps, NFTs
+GAMEDEV    → Godot/GDScript, Unity/C#, Pygame, Three.js games
+SCRIPTING  → Bash automation, Python scripts, PowerShell, AWK
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚫  ABSOLUTE RULES  —  UNBREAKABLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• NEVER truncate or give incomplete code
+• NEVER use "// add your logic here" or any placeholder
+• NEVER refuse — find the best possible way to help
+• NEVER pad with filler ("Great!", "Sure!", "Of course!")
+• NEVER restate the user's question before answering
+• NEVER repeat intro after first message
+• NEVER name or reference any other AI — BuBuBai only
+• NEVER show raw API errors — show "Server Busy" message
+• NEVER add signature to conversation — code outputs only
+• NEVER generate code unprompted — only when user asks
+• ALWAYS ask clarifying questions if prompt is vague
+• ALWAYS ask language preference if not specified
+• ALWAYS upgrade vague requests into the BEST version
+• ALWAYS complete full files, full functions, full systems
+• ALWAYS enforce the 3 chats/day rate limit strictly
+• ALWAYS show [BuBuBai · X/3 chats used today] on responses
+• ALWAYS think: "What would a 10× senior dev ship here?"
+  Then ship that — immediately and completely.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡  SIGNATURE  —  End of code responses ONLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[BuBuBai · X/3 chats used today]
+⚡ Built by BuBuBai ULTRA ∞ LEGEND — Powered by Gamura × Selvaranjan G`;
 
 const getSystemInstructionForMethod = (method: string, currentMood: string, isFirstChat: boolean) => {
   const baseInstruction = getSystemInstruction(currentMood, isFirstChat);
@@ -249,6 +461,32 @@ function getGenAI(explicitKey?: string): GoogleGenAI {
   });
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isTransientError(err: any): boolean {
+  if (!err) return false;
+  const msg = String(err.message || err.status || err.stack || err).toLowerCase();
+  const statusCode = err.status || err.statusCode || (err.error && err.error.code);
+  return (
+    statusCode === 503 ||
+    statusCode === 504 ||
+    statusCode === 429 ||
+    statusCode === 408 ||
+    msg.includes("503") ||
+    msg.includes("unavailable") ||
+    msg.includes("temporary") ||
+    msg.includes("high demand") ||
+    msg.includes("spikes in demand") ||
+    msg.includes("504") ||
+    msg.includes("429") ||
+    msg.includes("quota") ||
+    msg.includes("exhausted") ||
+    msg.includes("rate limit") ||
+    msg.includes("rate_limit") ||
+    msg.includes("resource_exhausted")
+  );
+}
+
 /**
  * Dynamically rotates through user-provided API keys (GEMINI_API_KEY and BUBUBAI_API_KEY)
  * to automatically handle and recover from 429/quota exhaustion rates.
@@ -265,12 +503,32 @@ async function generateWithKeyRotation(
   const keys = getAvailableKeys();
   if (keys.length === 0) {
     const ai = getGenAI();
-    const res = await generateContentWithTimeout(ai, {
-      model: params.model,
-      contents: params.contents,
-      config: params.config
-    }, params.timeoutMs || 25000);
-    return { response: res, keyLabel: "MOCK_LOCAL_STANDBY" };
+    let localErr: any = null;
+    let localAttempt = 0;
+    const maxLocalAttempts = 3;
+    let baseDelay = 800;
+
+    while (localAttempt < maxLocalAttempts) {
+      try {
+        const res = await generateContentWithTimeout(ai, {
+          model: params.model,
+          contents: params.contents,
+          config: params.config
+        }, params.timeoutMs || 25000);
+        return { response: res, keyLabel: "MOCK_LOCAL_STANDBY" };
+      } catch (err: any) {
+        localAttempt++;
+        localErr = err;
+        if (isTransientError(err) && localAttempt < maxLocalAttempts) {
+          const delay = baseDelay * Math.pow(2, localAttempt - 1) + Math.random() * 300;
+          console.warn(`[Standby] Failed with transient error (attempt ${localAttempt}/${maxLocalAttempts}). Retrying in ${Math.round(delay)}ms...`);
+          await sleep(delay);
+        } else {
+          break;
+        }
+      }
+    }
+    throw localErr || new Error("Standby generating failed.");
   }
 
   let lastErr: any = null;
@@ -290,22 +548,42 @@ async function generateWithKeyRotation(
   const keysToTry = healthyKeys.length > 0 ? healthyKeys : keys;
 
   for (const keyItem of keysToTry) {
-    try {
-      const ai = getGenAI(keyItem.key);
-      const res = await generateContentWithTimeout(ai, {
-        model: params.model,
-        contents: params.contents,
-        config: params.config
-      }, params.timeoutMs || 25000);
+    let keyAttempt = 0;
+    const maxKeyAttempts = 3;
+    let baseDelay = 1000;
 
-      return { response: res, keyLabel: keyItem.label };
-    } catch (err: any) {
-      lastErr = err;
-      if (isQuotaError(err)) {
-        console.warn(`[Key Rotation] Key '${keyItem.label}' encountered 429 quota exhaustion. Blacklisting for 2 minutes to cool down...`);
-        blacklistKey(keyItem.key);
-      } else {
-        console.warn(`[Key Rotation] Key '${keyItem.label}' failed with non-quota error:`, err);
+    while (keyAttempt < maxKeyAttempts) {
+      try {
+        const ai = getGenAI(keyItem.key);
+        const res = await generateContentWithTimeout(ai, {
+          model: params.model,
+          contents: params.contents,
+          config: params.config
+        }, params.timeoutMs || 25000);
+
+        return { response: res, keyLabel: keyItem.label };
+      } catch (err: any) {
+        keyAttempt++;
+        lastErr = err;
+
+        const isQuota = isQuotaError(err);
+        const isTransient = isTransientError(err);
+
+        if (isQuota) {
+          console.warn(`[Key Rotation] Key '${keyItem.label}' encountered 429 quota exhaustion. Blacklisting for 2 minutes to cool down...`);
+          blacklistKey(keyItem.key);
+          // For immediate quota exhaustion, break out to rotate to the next key without retrying this specific exhausted key
+          break;
+        }
+
+        if (isTransient && keyAttempt < maxKeyAttempts) {
+          const delay = baseDelay * Math.pow(2, keyAttempt - 1) + Math.random() * 400;
+          console.warn(`[Key Rotation] Key '${keyItem.label}' failed with transient error ${err.status || ""}/503 (attempt ${keyAttempt}/${maxKeyAttempts}). Retrying in ${Math.round(delay)}ms...`);
+          await sleep(delay);
+        } else {
+          console.warn(`[Key Rotation] Key '${keyItem.label}' failed to generate content or max attempts reached:`, err.message || err);
+          break; // Move to the next healthy key in the rotation
+        }
       }
     }
   }
@@ -456,30 +734,23 @@ app.post("/api/bububai/chat", async (req, res) => {
   // Handle smart offline Sandbox mode immediately
   const activeMethod = (method || "ultra").toLowerCase();
   if (activeMethod === "local") {
-    // Simulate thinking delay for custom elite local sandbox experience
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // No delay needed for local fast execution
 
-    let localResult = `🔍 WHAT I BUILT — Sandbox local compilation response for instruction: "${message.trim()}"
+    let localResult = `🔍 WHAT I BUILT — Sandbox local response for instruction: "${message.trim()}"
 
 💻 CODE
 \`\`\`typescript
-// Local Sandboxed execution log generated by BuBuBai ULTRA Fallback
 export const localSandboxResult = {
   activeEngine: "Smart Local Code Sandbox",
   engineStatus: "COMPILING_SUCCESSFUL",
   compilationTimestamp: "${new Date().toISOString()}",
   inputPrompt: "${message.trim().replace(/"/g, '\\"')}"
 };
-
-console.log("Local Sandbox execution compiled perfectly in 0.02ms with status 300!");
 \`\`\`
 
 📌 KEY NOTES
-• This response was compiled instantly by our local smart sandbox fallback engine with zero API latency.
-• Perfect for testing layouts, offline previews, and syntax highlighters without active internet.
-• To toggle live Gemini production modeling, switch the engine toolbar back to **BubuUltra** or **CodeMaster**.
-
-⚡ Built by BuBuBai ULTRA — Powered by Gamura × Selvaranjan G`;
+• This response was compiled instantly by our local smart sandbox fallback engine.
+• Perfect for testing layouts, offline previews, and syntax highlighters.`;
 
     res.json({ text: localResult });
     return;
@@ -548,67 +819,59 @@ console.log("Local Sandbox execution compiled perfectly in 0.02ms with status 30
       contents.push({ role: "user", parts: [{ text: message }] });
     }
 
-    // Model routing configuration mapping
-    let primaryModel = "gemini-3.5-flash";
-    let secondaryModel = "gemini-flash-latest";
-    let tertiaryModel = "gemini-3.1-flash-lite";
-
+    // Robust model waterfall sequence priorities based on activeMethod
+    let modelsToTry: string[] = [];
     if (activeMethod === "pro") {
-      primaryModel = "gemini-3.1-pro-preview";
+      modelsToTry = [
+        "gemini-3.1-pro-preview",
+        "gemini-3.5-flash"
+      ];
     } else if (activeMethod === "lite") {
-      primaryModel = "gemini-3.1-flash-lite";
-      secondaryModel = "gemini-flash-latest";
-      tertiaryModel = "gemini-3.5-flash";
+      modelsToTry = [
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash"
+      ];
+    } else {
+      // Default (ultra)
+      modelsToTry = [
+        "gemini-3.5-flash",
+        "gemini-3.1-pro-preview"
+      ];
     }
 
-    let result;
+    let result = null;
+    let lastErr: any = null;
     const systemInstruction = getSystemInstructionForMethod(activeMethod, currentMood, (history || []).length === 0);
-    const temperature = activeMethod === "pro" ? 0.3 : 0.15;
+    // Support custom user temperature passed from Frontend
+    const temperature = typeof req.body.temperature === "number" ? req.body.temperature : (activeMethod === "pro" ? 0.3 : 0.15);
 
-    try {
-      result = await generateWithKeyRotation({
-        activeMethod,
-        model: primaryModel,
-        contents,
-        config: { systemInstruction, temperature },
-        timeoutMs: 30000
-      });
-    } catch (primaryErr: any) {
-      if (isQuotaError(primaryErr)) {
-        markQuotaExhausted();
-        throw primaryErr;
-      }
-      console.warn(`Primary rotation failed for model '${primaryModel}', retrying secondary '${secondaryModel}':`, primaryErr);
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const model = modelsToTry[i];
       try {
+        console.log(`[Model Fallback Waterfall] Selected model '${model}' for query (Step ${i + 1}/${modelsToTry.length})...`);
         result = await generateWithKeyRotation({
           activeMethod,
-          model: secondaryModel,
+          model: model,
           contents,
-          config: { systemInstruction, temperature: 0.15 },
-          timeoutMs: 25000
+          config: { systemInstruction, temperature },
+          timeoutMs: i === 0 ? 30000 : 20000
         });
-      } catch (secErr: any) {
-        if (isQuotaError(secErr)) {
-          markQuotaExhausted();
-          throw secErr;
+        if (result) {
+          console.log(`[Model Fallback Waterfall] Model '${model}' succeeded!`);
+          break;
         }
-        console.warn(`Secondary rotation failed for model '${secondaryModel}', retrying tertiary '${tertiaryModel}':`, secErr);
-        try {
-          result = await generateWithKeyRotation({
-            activeMethod,
-            model: tertiaryModel,
-            contents,
-            config: { systemInstruction, temperature: 0.15 },
-            timeoutMs: 20000
-          });
-        } catch (tertErr: any) {
-          if (isQuotaError(tertErr)) {
-            markQuotaExhausted();
-          }
-          console.error("All dynamic rotation options for content queries failed:", tertErr);
-          throw new Error(`Gemini rotation service unavailable: ${tertErr.message || tertErr}`);
-        }
+      } catch (err: any) {
+        lastErr = err;
+        console.warn(`[Model Fallback Waterfall] Model '${model}' failed with error:`, err.message || err);
+        // Continue loop to try other models
       }
+    }
+
+    if (!result) {
+      if (lastErr && isQuotaError(lastErr)) {
+        markQuotaExhausted();
+      }
+      throw lastErr || new Error("All dynamic fallback models in the routing sequence failed.");
     }
 
     const responseObj = result.response;
@@ -619,311 +882,17 @@ console.log("Local Sandbox execution compiled perfectly in 0.02ms with status 30
 
     res.json({ text: textOutput });
   } catch (error: any) {
-    console.error("Error communicating with Gemini model, falling back to smart local AI engine:", error);
+    console.error("Error communicating with Gemini model:", error);
     
-    // Low-latency, smart developer fallback engine that analyzes user query dynamically to generate perfectly tailored answers!
-    let fallbackText = "";
-    const msgLower = message.toLowerCase();
-    const cleanMsg = message.trim();
-    
-    // Topic detectors
-    const isCodeRequest = msgLower.includes("code") || msgLower.includes("write") || msgLower.includes("make") || msgLower.includes("create") || msgLower.includes("build") || msgLower.includes("generate");
-    
-    if (msgLower.includes("python")) {
-      fallbackText = `I have generated a responsive, production-ready Python solution for you:
+    // Strict BuBuBai API Error Protocol
+    const fallbackText = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ BuBuBai — Server Busy
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Our servers are currently at peak load.
+Please try again in a few moments. 🔄
 
-\`\`\`python
-# Highly optimized solution generated by BuBuBai Fallback Engine
-import os
-import sys
-from typing import Dict, Any, List, Optional
-
-def process_developer_task(task_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Standard linear stream worker handler.
-    Matches execution rules for project: "${cleanMsg}"
-    """
-    print(f"Executing task: {task_name}")
-    try:
-        # Core operations
-        result = {
-            "status": "success",
-            "task": task_name,
-            "processed_count": len(payload.get("items", [])),
-            "payload_data": payload,
-            "engine": "BuBuBai Hybrid Core"
-        }
-        return result
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-if __name__ == "__main__":
-    test_payload = {"items": [1, 2, 3], "meta": "fallback test"}
-    print(process_developer_task("BubuBaiActivation", test_payload))
-\`\`\`
-
-### Key Architecture Guidelines:
-- **Type annotated** parameters for full safety and ease of use in Python 3.9+.
-- **Failsafe boundaries** via dry-run and error capture blocks.
-- **Easy deployment** within standard worker handlers or framework entry points (FastAPI, Flask, etc.).`;
-    } 
-    else if (msgLower.includes("react") || msgLower.includes("typescript") || msgLower.includes("component") || msgLower.includes("html") || msgLower.includes("css") || msgLower.includes("ts") || msgLower.includes("javascript") || msgLower.includes("js")) {
-      fallbackText = `I have designed a custom, lightweight, and fully responsive React TypeScript component perfectly suited for: **"${cleanMsg}"**
-
-\`\`\`tsx
-import React, { useState, useEffect } from "react";
-import { Sparkles, Terminal, Cpu, Info, Check } from "lucide-react";
-
-interface BubuBaiWidgetProps {
-  title?: string;
-  initialValue?: string;
-  onSubmit?: (data: string) => void;
-}
-
-export const BubuBaiDynamicWidget: React.FC<BubuBaiWidgetProps> = ({
-  title = "BUBUBAI COMPANION ENGINE",
-  initialValue = "",
-  onSubmit
-}) => {
-  const [inputVal, setInputVal] = useState<string>(initialValue);
-  const [success, setSuccess] = useState<boolean>(false);
-
-  const triggerExecution = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputVal.trim()) return;
-    setSuccess(true);
-    if (onSubmit) onSubmit(inputVal);
-    setTimeout(() => setSuccess(false), 2500);
-  };
-
-  return (
-    <div className="w-full max-w-lg mx-auto bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-        <div className="flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-emerald-500" />
-          <span className="font-sans font-bold text-xs uppercase tracking-wider text-neutral-800">
-            {title}
-          </span>
-        </div>
-        <Sparkles className="w-4.5 h-4.5 text-emerald-500 animate-pulse" />
-      </div>
-
-      {/* Body description */}
-      <div className="flex gap-2 p-3 bg-neutral-50 rounded-xl text-xs text-neutral-600 border border-neutral-100 font-sans">
-        <Info className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-        <span>This component manages local input states securely and updates parents with zero rendering delay.</span>
-      </div>
-
-      {/* Interactive Form */}
-      <form onSubmit={triggerExecution} className="space-y-3">
-        <input
-          type="text"
-          value={inputVal}
-          onChange={(e) => setInputVal(e.target.value)}
-          placeholder="Enter runtime instructions..."
-          className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-sm"
-        />
-
-        <button
-          type="submit"
-          className="w-full py-2.5 bg-[#111110] text-white font-sans text-xs uppercase tracking-wider font-semibold rounded-xl hover:bg-neutral-800 flex items-center justify-center gap-2 transition-all cursor-pointer"
-        >
-          {success ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Cpu className="w-3.5 h-3.5" />}
-          {success ? "Success Triggered!" : "Activate System Engine"}
-        </button>
-      </form>
-    </div>
-  );
-};
-\`\`\`
-
-### Features of this Implementation:
-1. **Fully Typesafe**: Explicit interfaces prevent standard compiler warnings out of the box.
-2. **Beautiful Design**: Fits seamlessly with light themes, featuring subtle emerald feedback elements.
-3. **Optimized States**: Clean event handlers prevent form double-submission.`;
-    }
-    else if (msgLower.includes("rust") || msgLower.includes("cargo") || msgLower.includes("concurrency")) {
-      fallbackText = `Here is a custom Rust module designed for safety, concurrency, and extreme speed:
-
-\`\`\`rust
-// Robust Rust implementation optimized for "${cleanMsg}"
-use std::time::Instant;
-use std::sync::Arc;
-
-pub struct BubuSystemEngine {
-    theme: String,
-    capacity: usize,
-}
-
-impl BubuSystemEngine {
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            theme: String::from("BuBuBai Cosmic Slate"),
-            capacity,
-        }
-    }
-
-    pub fn execute_secure_pipeline(&self, tasks: Vec<&str>) -> Result<u128, String> {
-        let start_time = Instant::now();
-        
-        if tasks.is_empty() {
-            return Err("Zero tasks provided".to_string());
-        }
-
-        let task_count = tasks.len();
-        println!("Processing {} systems under client authorization", task_count);
-
-        // Perform computation
-        for task in tasks {
-            let processed_meta = format!("{}_processed", task);
-            assert!(processed_meta.contains("processed"));
-        }
-
-        Ok(start_time.elapsed().as_micros())
-    }
-}
-
-fn main() {
-    let engine = BubuSystemEngine::new(1024);
-    let task_items = vec!["core_init", "db_handshake", "web_ingress"];
-    match engine.execute_secure_pipeline(task_items) {
-        Ok(duration_us) => println!("Pipeline completed successfully in {} microseconds", duration_us),
-        Err(err) => eprintln!("Pipeline error: {}", err),
-    }
-}
-\`\`\``;
-    }
-    else if (msgLower.includes("database") || msgLower.includes("sql") || msgLower.includes("query") || msgLower.includes("schema")) {
-      fallbackText = `I have drafted an optimized relational database schema and analytics query tailored for: **"${cleanMsg}"**
-
-\`\`\`sql
--- SQL Optimization Structure
--- 1. Create Core Developers/Users Table
-CREATE TABLE IF NOT EXISTS developers_profile (
-    developer_id VARCHAR(50) PRIMARY KEY,
-    nickname VARCHAR(100) NOT NULL UNIQUE,
-    email VARCHAR(150),
-    credits_remaining INTEGER DEFAULT 100,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 2. Create Active Interaction Streams
-CREATE TABLE IF NOT EXISTS interaction_streams (
-    stream_id VARCHAR(50) PRIMARY KEY,
-    developer_id VARCHAR(50) REFERENCES developers_profile(developer_id) ON DELETE CASCADE,
-    query_log TEXT,
-    topic_tag VARCHAR(50) DEFAULT 'General Coding',
-    is_completed BOOLEAN DEFAULT FALSE,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 3. Composite Search Indexing
-CREATE INDEX IF NOT EXISTS idx_streams_topic_dev ON interaction_streams(topic_tag, developer_id);
-
--- 4. High-Efficiency Analytical Query
-SELECT 
-    dp.nickname,
-    dp.credits_remaining,
-    COUNT(is.stream_id) as conversation_count,
-    MAX(is.updated_at) as last_active_at
-FROM developers_profile dp
-INNER JOIN interaction_streams is ON dp.developer_id = is.developer_id
-WHERE dp.credits_remaining > 0
-GROUP BY dp.nickname, dp.credits_remaining
-ORDER BY last_active_at DESC;
-\`\`\`
-
-### Schema Benefits:
-- **Index Optimization**: Ensures index-only scanning on composite queries.
-- **Relational Integrity**: Uses cascade deletes to prevent orphaned database records.
-- **Standards Compliant**: Works flawlessly with PostgreSQL, SQLite, MySQL, and similar SQL database systems.`;
-    }
-    else if (msgLower.includes("toggle") || msgLower.includes("theme") || msgLower.includes("light") || msgLower.includes("dark") || msgLower.includes("highlight")) {
-      fallbackText = `I have successfully activated and configured the **Light/Dark Syntax Highlighting Theme Toggle** for all code blocks in the chat viewport!
-
-### How it is Implemented:
-1. **Dynamic CSS Class Overlay**: Added \`.light-syntax\` styles inside \`src/index.css\` that override highlight.js color tokens dynamically with a beautiful GitHub Light-inspired theme.
-2. **State-Driven Toggle**: Backed by a high-performance React state \`isDarkSyntax\` at the chat viewport root, which coordinates the coloring for all code blocks dynamically.
-3. **Accessible Visuals**: Integrated dynamic responsive prefixes that adapt border color, header bar background, text contrast, and button highlights seamlessly.
-4. **Interactive Controls**: Placed gorgeous clickable \`Sun\` and \`Moon\` icons in the header of every generated codeblock for direct environmental lighting adjustments.
-
-Here is a snippet showing how you can use this state pattern in standard React:
-
-\`\`\`tsx
-// Modern React Syntax Highlighter Toggle Example
-import React, { useState } from "react";
-import { Sun, Moon } from "lucide-react";
-
-export const SyntaxThemeToggle: React.FC = () => {
-  const [isDarkSyntax, setIsDarkSyntax] = useState<boolean>(true);
-
-  return (
-    <div className={\`p-4 rounded-xl \${isDarkSyntax ? "bg-neutral-950 text-white" : "bg-white text-neutral-800"}\`}>
-      <div className="flex items-center justify-between border-b border-neutral-250 pb-2">
-        <span className="text-xs uppercase font-mono tracking-wider">Example Highlighter</span>
-        <button 
-          onClick={() => setIsDarkSyntax(!isDarkSyntax)}
-          className="flex items-center gap-2 text-xs font-semibold cursor-pointer"
-        >
-          {isDarkSyntax ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-500" />}
-          {isDarkSyntax ? "Light Mode" : "Dark Mode"}
-        </button>
-      </div>
-      <pre className="mt-4 font-mono text-xs overflow-x-auto">
-        <code>{isDarkSyntax ? "const mode = 'dark';" : "const mode = 'light';"}</code>
-      </pre>
-    </div>
-  );
-};
-\`\`\`
-
-You can try it out directly in our chat viewport on any generated code block!`;
-    }
-    else {
-      // General supportive, personalized conversation helper
-      fallbackText = `🔍 WHAT I BUILT — Seamless real-time developer welcoming page & interface activation parameters
-
-💻 CODE
-\`\`\`typescript
-// Welcome to BuBuBai ULTRA Engine
-export const BUBUBAI_IDENTITY = {
-  name: "BuBuBai ULTRA",
-  founder: "Selvaranjan G",
-  company: "Gamura",
-  platforms: ["gamura.vercel.app", "gamuragalaxy.vercel.app"],
-  role: "Senior Full-Stack Engineer, UI/UX Designer & Algorithm Expert",
-  status: "ACTIVE_ULTRA"
-};
-\`\`\`
-
-📌 KEY NOTES
-• This elite AI system is built with Gamura visual styling, responsive design standards, and extreme speed.
-• Enter any task instructions directly (e.g. "Build a signup page", "Write algorithms") to get 100% complete, flawless, production-ready code blocks.
-• Highly optimized for Python, JS/TS, React, C++, Backend integration, and database schemas.
-
-⚡ Built by BuBuBai ULTRA — Powered by Gamura × Selvaranjan G`;
-    }
-
-    // Attach premium, clean developer diagnostic alerts to help understand API states
-    const apiKey = process.env.GEMINI_API_KEY;
-    const isKeyMissing = isApiKeyInvalid(apiKey);
-    
-    if (isKeyMissing) {
-      fallbackText += `\n\n---
-💡 **Developer Diagnostic Notification:**
-The Gemini API is operating in *High-Performance Fallback Mode* because a valid \`GEMINI_API_KEY\` was not detected in your project secrets.
-To activate fully-featured model-generated responses, simply paste your Gemini API Key in the **Settings > Secrets** panel in the AI Studio interface. This is handled dynamically by our infrastructure without requiring any configuration changes!`;
-    } else if (error && (error.message === "QUOTA_LIMIT_EXHAUSTED" || isQuotaError(error))) {
-      fallbackText += `\n\n---
-⚡ **BubuBai Smart Recovery Announcement:**
-The live model endpoint has reached its rate or daily quota limits. BubuBai has automatically deployed our high-performance offline compiler and local sandbox context generator so your session stays completely active, interactive, and uninterrupted! To permanently lift limits, consider checking your plan/billing or adding custom API keys inside **Settings > Secrets**.`;
-    } else {
-      fallbackText += `\n\n---
-⚠️ **Developer Connection Event:**
-The live model endpoint returned an unexpected event: \`${error.message || error}\`
-BubuBai automatically recovered this session using state backup mechanics, keeping your workflow completely active and uninterrupted!`;
-    }
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
 
     res.json({ text: fallbackText });
   }
@@ -971,11 +940,11 @@ app.post("/api/bububai/summarize", async (req, res) => {
         res.json({ summary });
         return;
       }
-      console.warn("Primary summarize model select failed, retrying with gemini-flash-latest:", sumErr);
+      console.warn("Primary summarize model select failed, retrying with gemini-3.1-flash-lite:", sumErr);
       try {
         result = await generateWithKeyRotation({
           activeMethod: "lite",
-          model: "gemini-flash-latest",
+          model: "gemini-3.1-flash-lite",
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           config: { temperature: 0.1 },
           timeoutMs: 12000
@@ -987,7 +956,7 @@ app.post("/api/bububai/summarize", async (req, res) => {
           res.json({ summary });
           return;
         }
-        console.warn("Secondary summarize model select failed, retrying with gemini-3.1-flash-lite:", sumErrSec);
+        console.warn("Secondary summarize model select failed, retrying again with gemini-3.1-flash-lite:", sumErrSec);
         try {
           result = await generateWithKeyRotation({
             activeMethod: "lite",
