@@ -59,7 +59,22 @@ export default function App() {
     const timer = setTimeout(() => {
       setIsAppLoading(false);
     }, 1500);
-    return () => clearTimeout(timer);
+
+    // Safety fallback: ensure loading screen is dismissed even if Firebase Auth is slow or fails silently
+    const authTimer = setTimeout(() => {
+      setIsAuthChecking((isChecking) => {
+        if (isChecking) {
+          console.warn("Auth check safety fallback triggered.");
+          return false;
+        }
+        return isChecking;
+      });
+    }, 4500);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(authTimer);
+    };
   }, []);
 
   const [slideOpen, setSlideOpen] = useState(false);
@@ -136,7 +151,7 @@ export default function App() {
           const userDoc = await runWithRetry(() =>
             getDoc(doc(db, "users", user.uid)),
           );
-          if (userDoc.exists()) {
+          if (userDoc && userDoc.exists()) {
             const data = userDoc.data();
             setUserProfile(data);
             localStorage.setItem(
@@ -308,7 +323,7 @@ export default function App() {
           const userDoc = await runWithRetry(() =>
             getDoc(doc(db, "users", user.uid)),
           );
-          if (userDoc.exists()) {
+          if (userDoc && userDoc.exists()) {
             setUserProfile(userDoc.data());
           }
         } catch (err) {
@@ -481,7 +496,7 @@ export default function App() {
         try {
           const userDoc = await runWithRetry(() => getDoc(userDocRef));
 
-          if (!userDoc.exists()) {
+          if (!userDoc || !userDoc.exists()) {
             try {
               // Enforce Unique Username schema on Google Auth
               const usernameQuery = query(
@@ -492,7 +507,7 @@ export default function App() {
               const usernameSnap = await runWithRetry(() =>
                 getDocs(usernameQuery),
               );
-              if (!usernameSnap.empty) {
+              if (usernameSnap && !usernameSnap.empty) {
                 finalUsername = `${finalUsername}_${Date.now().toString().slice(-4)}`;
               }
             } catch (e) {
@@ -516,11 +531,13 @@ export default function App() {
             );
           } else {
             const serverProfile = userDoc.data();
-            setUserProfile(serverProfile);
-            localStorage.setItem(
-              `bububai_profile_${user.uid}`,
-              JSON.stringify(serverProfile),
-            );
+            if (serverProfile) {
+              setUserProfile(serverProfile);
+              localStorage.setItem(
+                `bububai_profile_${user.uid}`,
+                JSON.stringify(serverProfile),
+              );
+            }
           }
         } catch (getErr) {
           console.warn(

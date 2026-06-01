@@ -99,5 +99,10 @@ service cloud.firestore {
 
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
+
+    // 4. Rules for the user_limits collection
+    match /user_limits/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
   }
 }

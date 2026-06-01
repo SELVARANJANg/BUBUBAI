@@ -1,36 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
-import firebaseConfigJson from "../firebase-applet-config.json";
-
-// Safe dynamic lookup for client-side environments (Vite imports) and serverless fallbacks
-const getEnvVal = (key: string): string | undefined => {
-  try {
-    const metaEnv = (import.meta as any).env as Record<string, any>;
-    if (metaEnv && metaEnv[key]) {
-      return metaEnv[key];
-    }
-  } catch (e) {}
-
-  try {
-    if (typeof process !== "undefined" && process.env && process.env[key]) {
-      return process.env[key];
-    }
-  } catch (e) {}
-
-  return undefined;
-};
-
-// Assemble configuration prioritizing environment variables, falling back to static config json
-const firebaseConfig = {
-  apiKey: getEnvVal("VITE_FIREBASE_API_KEY") || getEnvVal("VITE_API_KEY") || firebaseConfigJson.apiKey,
-  authDomain: getEnvVal("VITE_FIREBASE_AUTH_DOMAIN") || firebaseConfigJson.authDomain,
-  projectId: getEnvVal("VITE_FIREBASE_PROJECT_ID") || firebaseConfigJson.projectId,
-  storageBucket: getEnvVal("VITE_FIREBASE_STORAGE_BUCKET") || firebaseConfigJson.storageBucket,
-  messagingSenderId: getEnvVal("VITE_FIREBASE_MESSAGING_SENDER_ID") || firebaseConfigJson.messagingSenderId,
-  appId: getEnvVal("VITE_FIREBASE_APP_ID") || firebaseConfigJson.appId,
-  measurementId: getEnvVal("VITE_FIREBASE_MEASUREMENT_ID") || firebaseConfigJson.measurementId,
-};
+import firebaseConfig from "../firebase-applet-config.json";
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

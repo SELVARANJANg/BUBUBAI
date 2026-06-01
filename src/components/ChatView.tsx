@@ -131,6 +131,85 @@ export function ChatView({
 
   const displayName = userProfile?.nickname || userProfile?.name || "Selva";
 
+  const [dailyUsage, setDailyUsage] = useState<{ date: string; count: number }>({
+    date: new Date().toDateString(),
+    count: 0,
+  });
+
+  const fetchDailyUsage = async () => {
+    const uid = userProfile?.uid || auth?.currentUser?.uid;
+    if (!uid) return;
+    try {
+      const docRef = doc(db, "user_limits", uid);
+      const docSnap = await runWithRetry(() => getDoc(docRef));
+      const todayStr = new Date().toDateString();
+
+      if (docSnap && docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.date === todayStr) {
+          setDailyUsage({
+            date: data.date,
+            count: typeof data.count === "number" ? data.count : 0,
+          });
+        } else {
+          setDailyUsage({
+            date: todayStr,
+            count: 0,
+          });
+          await runWithRetry(() =>
+            setDoc(docRef, {
+              date: todayStr,
+              count: 0,
+              userId: uid,
+              updatedAt: serverTimestamp(),
+            })
+          );
+        }
+      } else {
+        setDailyUsage({
+          date: todayStr,
+          count: 0,
+        });
+        await runWithRetry(() =>
+          setDoc(docRef, {
+            date: todayStr,
+            count: 0,
+            userId: uid,
+            updatedAt: serverTimestamp(),
+          })
+        );
+      }
+    } catch (e) {
+      console.warn("Could not read daily chat limit:", e);
+    }
+  };
+
+  const incrementDailyUsage = async () => {
+    const uid = userProfile?.uid || auth?.currentUser?.uid;
+    if (!uid) return;
+    try {
+      const todayStr = new Date().toDateString();
+      const nextCount = dailyUsage.count + 1;
+      setDailyUsage({ date: todayStr, count: nextCount });
+
+      const docRef = doc(db, "user_limits", uid);
+      await runWithRetry(() =>
+        setDoc(docRef, {
+          date: todayStr,
+          count: nextCount,
+          userId: uid,
+          updatedAt: serverTimestamp(),
+        })
+      );
+    } catch (err) {
+      console.warn("Failed to increment user daily limit:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchDailyUsage();
+  }, [userProfile?.uid, activeChatId]);
+
   // Dynamically generate a concise summary of the conversation using Gemini API
   useEffect(() => {
     // Only fetch a summary if messages are ready, we aren't loading, and we don't already have one!
@@ -224,7 +303,7 @@ export function ChatView({
       const docSnap = await runWithRetry(() =>
         getDoc(doc(db, "chats", chatId)),
       );
-      if (docSnap.exists()) {
+      if (docSnap && docSnap.exists()) {
         const data = docSnap.data();
         const loadedMessages: ChatMessage[] = (data.messages || []).map(
           (m: any) => ({
@@ -288,6 +367,22 @@ export function ChatView({
     promptText: string,
     targetChatId?: string,
   ) => {
+    if (dailyUsage.count >= 3) {
+      const limitReply: ChatMessage = {
+        id: `m-limit-${Date.now()}`,
+        role: "model",
+        content: `⚠️ **DAILY LIMIT REACHED**
+        
+You have used your daily limit of **3 chats** today. Please come back tomorrow to continue working on your creative coding projects!
+        
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G`,
+        timestamp: new Date(),
+      };
+      setMessages([limitReply]);
+      setIsLoading(false);
+      return;
+    }
+
     const userMsg: ChatMessage = {
       id: `m-user-${Date.now()}`,
       role: "user",
@@ -298,6 +393,7 @@ export function ChatView({
     const freshMessages = [userMsg];
     setMessages(freshMessages);
     setIsLoading(true);
+    await incrementDailyUsage();
     saveChatSession(freshMessages, targetChatId);
 
     try {
@@ -351,6 +447,23 @@ Please try again in a few moments. 🔄
 
   const handleSendReply = async () => {
     if (!inputValue.trim() || isLoading) return;
+
+    if (dailyUsage.count >= 3) {
+      const limitReply: ChatMessage = {
+        id: `m-limit-${Date.now()}`,
+        role: "model",
+        content: `⚠️ **DAILY LIMIT REACHED**
+        
+You have used your daily limit of **3 chats** today. Please come back tomorrow to continue working on your creative coding projects!
+        
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, limitReply]);
+      setIsLoading(false);
+      return;
+    }
+
     const userPrompt = inputValue;
     setInputValue("");
 
@@ -368,6 +481,7 @@ Please try again in a few moments. 🔄
     const updatedMessages = [...messages, newUserMsg];
     setMessages(updatedMessages);
     setIsLoading(true);
+    await incrementDailyUsage();
     saveChatSession(updatedMessages);
 
     // Map conversation log for model memory context and prune for context window efficiency
@@ -643,8 +757,25 @@ Please try again in a few moments. 🔄
   };
 
   // Regenerate last AI response
-  const handleRegenerate = () => {
+  const handleRegenerate = async () => {
     if (messages.length < 2 || isLoading) return;
+
+    if (dailyUsage.count >= 3) {
+      const limitReply: ChatMessage = {
+        id: `m-limit-${Date.now()}`,
+        role: "model",
+        content: `⚠️ **DAILY LIMIT REACHED**
+        
+You have used your daily limit of **3 chats** today. Please come back tomorrow to continue working on your creative coding projects!
+        
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, limitReply]);
+      setIsLoading(false);
+      return;
+    }
+
     // Find last user message index
     let lastUserIndex = -1;
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -659,6 +790,7 @@ Please try again in a few moments. 🔄
       // Slice and trigger reply fetch again
       setMessages((prev) => prev.slice(0, lastUserIndex + 1));
       setIsLoading(true);
+      await incrementDailyUsage();
 
       const historyPayload = trimHistoryToContextWindow(
         messages.slice(0, lastUserIndex).map((m) => ({
@@ -715,6 +847,23 @@ Please try again in a few moments. 🔄
   // Handles editing of user prompt and regeneration of subsequent AI response
   const handleSaveAndRegenerate = async (messageId: string) => {
     if (!editingText.trim() || isLoading) return;
+
+    if (dailyUsage.count >= 3) {
+      const limitReply: ChatMessage = {
+        id: `m-limit-${Date.now()}`,
+        role: "model",
+        content: `⚠️ **DAILY LIMIT REACHED**
+        
+You have used your daily limit of **3 chats** today. Please come back tomorrow to continue working on your creative coding projects!
+        
+— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, limitReply]);
+      setIsLoading(false);
+      return;
+    }
+
     const newContent = editingText;
     setEditingMessageId(null);
 
@@ -733,6 +882,7 @@ Please try again in a few moments. 🔄
 
     setMessages(updatedMessages);
     setIsLoading(true);
+    await incrementDailyUsage();
     saveChatSession(updatedMessages);
 
     // Prune history using context window prior to API call
@@ -1363,11 +1513,16 @@ Please try again in a few moments. 🔄
               BuBuBai
             </span>
           </div>
-          {chatSummary && (
-            <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-600 bg-emerald-50/80 px-2.5 py-0.5 rounded-full mt-1 border border-emerald-100 font-bold max-w-[280px] truncate">
-              {chatSummary}
+          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1">
+            {chatSummary && (
+              <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-600 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-100 font-bold max-w-[150px] truncate">
+                {chatSummary}
+              </span>
+            )}
+            <span className={`font-mono text-[9px] uppercase tracking-wider px-2.5 py-0.5 rounded-full border font-bold ${dailyUsage.count >= 3 ? "text-red-100 bg-red-600 border-red-700" : "text-neutral-600 bg-neutral-100/80 border-neutral-200"}`}>
+              {Math.max(0, 3 - dailyUsage.count)}/3 CHATS REMAINING
             </span>
-          )}
+          </div>
         </div>
 
         <div className="relative">
@@ -1667,10 +1822,11 @@ Please try again in a few moments. 🔄
             {/* Expansible prompt field resembling standard chat */}
             <textarea
               ref={textareaRef}
-              className="flex-1 max-h-[120px] bg-transparent text-[#111110] font-sans text-[15px] focus:outline-none resize-none pt-2.5 pb-1 px-1 leading-normal select-text relative z-10 placeholder:text-neutral-400"
-              placeholder="Ask BuBuBai..."
+              className={`flex-1 max-h-[120px] bg-transparent text-[#111110] font-sans text-[15px] focus:outline-none resize-none pt-2.5 pb-1 px-1 leading-normal select-text relative z-10 placeholder:text-neutral-400 ${dailyUsage.count >= 3 ? "opacity-50 cursor-not-allowed" : ""}`}
+              placeholder={dailyUsage.count >= 3 ? "Daily limit of 3 chats reached." : "Ask BuBuBai..."}
               rows={1}
               value={inputValue}
+              disabled={dailyUsage.count >= 3}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
             />
@@ -1679,9 +1835,9 @@ Please try again in a few moments. 🔄
             <button
               type="button"
               onClick={handleSendReply}
-              disabled={!inputValue.trim() || isLoading}
+              disabled={!inputValue.trim() || isLoading || dailyUsage.count >= 3}
               className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 relative z-10 overflow-hidden outline-none touch-manipulation tap-highlight-transparent ${
-                inputValue.trim() || isLoading
+                (inputValue.trim() || isLoading) && dailyUsage.count < 3
                   ? "bg-[#111110] text-white cursor-pointer group-focus-within:bg-emerald-600"
                   : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
               } ${isLoading ? "scale-90 opacity-80" : "hover:scale-105 active:scale-95"}`}

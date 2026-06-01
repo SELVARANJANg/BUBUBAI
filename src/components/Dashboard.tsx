@@ -41,6 +41,8 @@ import {
   limit,
   updateDoc,
   serverTimestamp,
+  getDoc,
+  setDoc,
 } from "firebase/firestore";
 
 interface DashboardProps {
@@ -240,6 +242,62 @@ export function Dashboard({
     }
   }, [userProfile?.uid, userProfile?.name, userProfile?.nickname, userProfile?.phoneNumber, userProfile?.email, userProfile?.avatar, profileOpen]);
 
+  const [dailyUsage, setDailyUsage] = useState<{ date: string; count: number }>({
+    date: new Date().toDateString(),
+    count: 0,
+  });
+
+  const fetchDailyUsage = async () => {
+    if (!userProfile?.uid) return;
+    try {
+      const docRef = doc(db, "user_limits", userProfile.uid);
+      const docSnap = await runWithRetry(() => getDoc(docRef));
+      const todayStr = new Date().toDateString();
+
+      if (docSnap && docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.date === todayStr) {
+          setDailyUsage({
+            date: data.date,
+            count: typeof data.count === "number" ? data.count : 0,
+          });
+        } else {
+          setDailyUsage({
+            date: todayStr,
+            count: 0,
+          });
+          await runWithRetry(() =>
+            setDoc(docRef, {
+              date: todayStr,
+              count: 0,
+              userId: userProfile.uid,
+              updatedAt: serverTimestamp(),
+            })
+          );
+        }
+      } else {
+        setDailyUsage({
+          date: todayStr,
+          count: 0,
+        });
+        await runWithRetry(() =>
+          setDoc(docRef, {
+            date: todayStr,
+            count: 0,
+            userId: userProfile.uid,
+            updatedAt: serverTimestamp(),
+          })
+        );
+      }
+    } catch (e) {
+      console.warn("Could not read daily chat limit in Dashboard:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchDailyUsage();
+  }, [userProfile?.uid, activeChatId, activeChatPrompt, settingsOpen, drawerOpen]);
+
   // AI Avatar generation handler
   const handleGenerateAiAvatar = async () => {
     setProfileErrorMsg("SERVER BUSY PLEASE TRY AGAIN LATER.");
@@ -409,32 +467,34 @@ export function Dashboard({
       const twentyFourHoursMs = 24 * 60 * 60 * 1000;
       const deletePromises: Promise<any>[] = [];
 
-      querySnapshot.forEach((docSnap) => {
-        const docId = docSnap.id;
-        const data = docSnap.data();
-        let updatedAtTime = now;
+      if (querySnapshot) {
+        querySnapshot.forEach((docSnap) => {
+          const docId = docSnap.id;
+          const data = docSnap.data();
+          let updatedAtTime = now;
 
-        if (data.updatedAt) {
-          updatedAtTime = data.updatedAt.toDate
-            ? data.updatedAt.toDate().getTime()
-            : new Date(data.updatedAt).getTime();
-        }
+          if (data.updatedAt) {
+            updatedAtTime = data.updatedAt.toDate
+              ? data.updatedAt.toDate().getTime()
+              : new Date(data.updatedAt).getTime();
+          }
 
-        const diffTime = now - updatedAtTime;
-        if (diffTime >= twentyFourHoursMs) {
-          // Delete stales automatically for peak performance
-          deletePromises.push(
-            runWithRetry(() => deleteDoc(doc(db, "chats", docId))),
-          );
-        } else {
-          chatsList.push({
-            id: docId,
-            title: data.title || "BUBUBAI Conversation",
-            updatedAt: updatedAtTime,
-            messages: data.messages || [],
-          });
-        }
-      });
+          const diffTime = now - updatedAtTime;
+          if (diffTime >= twentyFourHoursMs) {
+            // Delete stales automatically for peak performance
+            deletePromises.push(
+              runWithRetry(() => deleteDoc(doc(db, "chats", docId))),
+            );
+          } else {
+            chatsList.push({
+              id: docId,
+              title: data.title || "BUBUBAI Conversation",
+              updatedAt: updatedAtTime,
+              messages: data.messages || [],
+            });
+          }
+        });
+      }
 
       if (deletePromises.length > 0) {
         await Promise.all(deletePromises);
@@ -591,9 +651,7 @@ export function Dashboard({
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              setActiveChatId(null);
-              setActiveChatPrompt(null);
-              setTextValue("");
+              handleChipClick("");
               setDrawerOpen(false);
             }}
           >
@@ -684,8 +742,24 @@ export function Dashboard({
                 Loading history...
               </div>
             ) : historyChats.length === 0 ? (
-              <div className="text-center py-3 text-[11px] font-serif italic text-neutral-400">
-                No recent chats
+              <div className="flex flex-col items-center justify-center py-5 px-3.5 text-center bg-emerald-50/20 border border-dashed border-emerald-200/50 rounded-2xl my-2">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center mb-2.5">
+                  <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
+                </div>
+                <h4 className="text-[12px] font-sans font-semibold text-neutral-800 tracking-tight">No Recent Conversations</h4>
+                <p className="text-[10px] font-sans text-neutral-500 max-w-[160px] mt-1 leading-normal">
+                  Ask code, design, or layout questions to begin your creative coding journey!
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleChipClick("");
+                    setDrawerOpen(false);
+                  }}
+                  className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-sans text-[11px] font-medium py-1.5 px-2.5 rounded-xl shadow-sm transition-all flex items-center justify-center gap-1"
+                >
+                  Start New Session
+                </button>
               </div>
             ) : (
               (() => {
@@ -701,8 +775,14 @@ export function Dashboard({
 
                 if (filteredHistoryChats.length === 0) {
                   return (
-                    <div className="text-center py-3 text-[11px] font-serif italic text-neutral-400">
-                      No results found
+                    <div className="flex flex-col items-center justify-center py-5 px-3.5 text-center bg-neutral-50/60 border border-dashed border-neutral-200/50 rounded-2xl my-2">
+                      <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center mb-2">
+                        <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                      </div>
+                      <h4 className="text-[11px] font-sans font-semibold text-neutral-600">No matches found</h4>
+                      <p className="text-[9px] font-sans text-neutral-400 mt-0.5 max-w-[140px] leading-normal">
+                        Try searching with another keyword or start fresh.
+                      </p>
                     </div>
                   );
                 }
@@ -1009,9 +1089,7 @@ export function Dashboard({
               <div className="absolute right-0 top-[calc(100%+8px)] w-40 z-50 bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] border border-neutral-100 py-1 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                 <button
                   onClick={() => {
-                    setActiveChatId(null);
-                    setActiveChatPrompt(null);
-                    setTextValue("");
+                    handleChipClick("");
                     setPlusMenuOpen(false);
                   }}
                   className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-neutral-700 hover:bg-neutral-50 active:bg-neutral-100 transition-colors flex items-center gap-2.5"
@@ -1093,48 +1171,63 @@ export function Dashboard({
             <textarea
               ref={textareaRef}
               id="ti"
-              className="dsb-textarea"
+              className={`dsb-textarea ${dailyUsage.count >= 3 ? "opacity-50 cursor-not-allowed" : ""}`}
               rows={1}
-              placeholder="Chat with BuBuBai..."
+              placeholder={dailyUsage.count >= 3 ? "Daily limit of 3 chats reached." : "Chat with BuBuBai..."}
               value={textValue}
+              disabled={dailyUsage.count >= 3}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
             />
-            <div className="box-foot">
-              <button
-                className="plus-btn"
-                title="Attach"
-                onClick={() => setBottomSheetOpen(true)}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
+            <div className="box-foot" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div className="flex items-center text-[11px] font-mono select-none font-bold tracking-tight">
+                {dailyUsage.count >= 3 ? (
+                  <span className="text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1">
+                    0/3 CHATS REMAINING
+                  </span>
+                ) : (
+                  <span className="text-neutral-500 bg-neutral-50 border border-neutral-200/50 rounded-lg px-2.5 py-1">
+                    {3 - dailyUsage.count} OF 3 CHATS LEFT TODAY
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="plus-btn"
+                  title="Attach"
+                  disabled={dailyUsage.count >= 3}
+                  onClick={() => setBottomSheetOpen(true)}
                 >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              </button>
-              <button
-                className="send-btn"
-                id="sb"
-                disabled={!textValue.trim()}
-                onClick={handleSend}
-                title="Send"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+                <button
+                  className="send-btn"
+                  id="sb"
+                  disabled={!textValue.trim() || dailyUsage.count >= 3}
+                  onClick={handleSend}
+                  title="Send"
                 >
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </button>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 

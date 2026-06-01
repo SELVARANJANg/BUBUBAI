@@ -823,28 +823,25 @@ export const localSandboxResult = {
     }
 
     // Robust model waterfall sequence priorities based on activeMethod
-    // Includes stable gemini-2.5 standard fallbacks to ensure working service across all key tiers
+    // Includes stable gemini-3 series and gemini-3.5 standard fallbacks to ensure working service across all key tiers
     let modelsToTry: string[] = [];
     if (activeMethod === "pro") {
       modelsToTry = [
         "gemini-3.1-pro-preview",
-        "gemini-2.5-pro",
         "gemini-3.5-flash",
-        "gemini-2.5-flash"
+        "gemini-3.1-flash-lite"
       ];
     } else if (activeMethod === "lite") {
       modelsToTry = [
         "gemini-3.1-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-2.5-flash"
+        "gemini-3.5-flash"
       ];
     } else {
       // Default (ultra)
       modelsToTry = [
         "gemini-3.5-flash",
-        "gemini-2.5-flash",
-        "gemini-3.1-pro-preview",
-        "gemini-2.5-pro"
+        "gemini-3.1-flash-lite",
+        "gemini-3.1-pro-preview"
       ];
     }
 
@@ -863,7 +860,7 @@ export const localSandboxResult = {
           model: model,
           contents,
           config: { systemInstruction, temperature },
-          timeoutMs: i === 0 ? 30000 : 20000
+          timeoutMs: i === 0 ? 15000 : 10000
         });
         if (result) {
           console.log(`[Model Fallback Waterfall] Model '${model}' succeeded!`);
