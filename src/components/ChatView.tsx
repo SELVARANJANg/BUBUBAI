@@ -88,6 +88,14 @@ interface ChatViewProps {
   onOpenBottomSheet: (appendFn: (text: string) => void) => void;
 }
 
+
+function getTimeGreeting() {
+  const currentHour = new Date().getHours();
+  if (currentHour >= 5 && currentHour < 12) return "Good Morning";
+  if (currentHour >= 12 && currentHour < 17) return "Good Afternoon";
+  if (currentHour >= 17 && currentHour < 21) return "Good Evening";
+  return "Good Night";
+}
 export function ChatView({
   initialPrompt,
   activeChatId,
@@ -357,7 +365,8 @@ export function ChatView({
         const welcomeMsg: ChatMessage = {
           id: `m-welcome-${Date.now()}`,
           role: "model",
-          content: `Hey ${displayName}! 👋 I'm BUBUBAI — ready to help.\nWhat are we working on today?`,
+          content: `${getTimeGreeting()}, ${displayName || 'Developer'}! 👾 Welcome back to BUBUBAI — your AI coding companion. What are we building today?\n\n**bububai**`,
+
           timestamp: new Date(),
         };
         setMessages([welcomeMsg]);
@@ -396,11 +405,8 @@ export function ChatView({
         body: JSON.stringify({
           message: promptText,
           history: [],
-          method: selectedMethod,
-          
-          temperature: localStorage.getItem("chat_temp")
-            ? parseFloat(localStorage.getItem("chat_temp")!)
-            : undefined,
+          usageCount: dailyUsage.count + 1,
+          username: displayName || 'Developer',
         }),
       });
 
@@ -491,11 +497,8 @@ Please try again in a few moments. 🔄
         body: JSON.stringify({
           message: userPrompt,
           history: historyPayload,
-          method: selectedMethod,
-          
-          temperature: localStorage.getItem("chat_temp")
-            ? parseFloat(localStorage.getItem("chat_temp")!)
-            : undefined,
+          usageCount: dailyUsage.count + 1,
+          username: displayName || 'Developer',
         }),
       });
 
@@ -751,7 +754,8 @@ Please try again in a few moments. 🔄
     const welcomeMsg: ChatMessage = {
       id: `m-welcome-${Date.now()}`,
       role: "model",
-      content: `Hey ${displayName}! 👋 I'm BUBUBAI — ready to help.\nWhat are we building today?`,
+      content: `${getTimeGreeting()}, ${displayName || 'Developer'}! 👾 Welcome back to BUBUBAI — your AI coding companion. What are we building today?\n\n**bububai**`,
+
       timestamp: new Date(),
     };
     setMessages([welcomeMsg]);
@@ -793,11 +797,8 @@ Please try again in a few moments. 🔄
         body: JSON.stringify({
           message: promptText,
           history: historyPayload,
-          method: selectedMethod,
-          
-          temperature: localStorage.getItem("chat_temp")
-            ? parseFloat(localStorage.getItem("chat_temp")!)
-            : undefined,
+          usageCount: dailyUsage.count + 1,
+          username: displayName || 'Developer',
         }),
       })
         .then((res) => res.json())
@@ -872,11 +873,8 @@ Please try again in a few moments. 🔄
         body: JSON.stringify({
           message: newContent,
           history: contextHistory,
-          method: selectedMethod,
-          
-          temperature: localStorage.getItem("chat_temp")
-            ? parseFloat(localStorage.getItem("chat_temp")!)
-            : undefined,
+          usageCount: dailyUsage.count + 1,
+          username: displayName || 'Developer',
         }),
       });
 
