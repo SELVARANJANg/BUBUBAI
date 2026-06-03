@@ -33,6 +33,7 @@ import {
   updateDoc,
   serverTimestamp,
 } from "firebase/firestore";
+import { ModesSheet, MODES } from "./ModesSheet";
 
 export interface ChatMessage {
   id: string;
@@ -106,8 +107,14 @@ export function ChatView({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
   const [showPopupMenu, setShowPopupMenu] = useState<boolean>(false);
+  
+  // Modes state
+  const [isModesSheetOpen, setIsModesSheetOpen] = useState(false);
+  const [activeModeId, setActiveModeId] = useState("normal");
+  const activeMode = MODES.find((m) => m.id === activeModeId) || MODES[0];
+
   const [selectedMethod, setSelectedMethod] = useState<string>(() => {
-    const stored = localStorage.getItem("bububai_default_model");
+    const stored = localStorage.getItem("chat_default_model");
     if (stored === "gemini-2.1-pro") return "pro";
     if (stored === "gemini-2.5-flash-lite") return "lite";
     if (stored === "gemini-2.5-flash") return "ultra";
@@ -250,7 +257,7 @@ export function ChatView({
     const docTitle = firstUserMsg
       ? firstUserMsg.content.slice(0, 40) +
         (firstUserMsg.content.length > 40 ? "..." : "")
-      : "BUBUBAI Code Chat";
+      : "Code Chat";
 
     const safeMessages = updatedMsgs.map((m) => ({
       id: m.id,
@@ -346,11 +353,11 @@ export function ChatView({
         isNewSessionRef.current = true;
         if (onChangeChatId) onChangeChatId(generatedId);
 
-        // Create a personalized warm welcome from BuBuBai matching strict rules!
+        // Create a personalized warm welcome from BUBUBAI matching strict rules!
         const welcomeMsg: ChatMessage = {
           id: `m-welcome-${Date.now()}`,
           role: "model",
-          content: `Hey ${displayName}! 👋 I'm BuBuBai — your elite AI for code,\ncreativity, and everything in between.\nWhat are we working on today?`,
+          content: `Hey ${displayName}! 👋 I'm BUBUBAI — ready to help.\nWhat are we working on today?`,
           timestamp: new Date(),
         };
         setMessages([welcomeMsg]);
@@ -367,21 +374,7 @@ export function ChatView({
     promptText: string,
     targetChatId?: string,
   ) => {
-    if (dailyUsage.count >= 3) {
-      const limitReply: ChatMessage = {
-        id: `m-limit-${Date.now()}`,
-        role: "model",
-        content: `⚠️ **DAILY LIMIT REACHED**
-        
-You have used your daily limit of **3 chats** today. Please come back tomorrow to continue working on your creative coding projects!
-        
-— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G`,
-        timestamp: new Date(),
-      };
-      setMessages([limitReply]);
-      setIsLoading(false);
-      return;
-    }
+    
 
     const userMsg: ChatMessage = {
       id: `m-user-${Date.now()}`,
@@ -393,7 +386,7 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
     const freshMessages = [userMsg];
     setMessages(freshMessages);
     setIsLoading(true);
-    await incrementDailyUsage();
+    incrementDailyUsage();
     saveChatSession(freshMessages, targetChatId);
 
     try {
@@ -404,18 +397,30 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
           message: promptText,
           history: [],
           method: selectedMethod,
-          temperature: localStorage.getItem("bububai_chat_temp")
-            ? parseFloat(localStorage.getItem("bububai_chat_temp")!)
+          
+          temperature: localStorage.getItem("chat_temp")
+            ? parseFloat(localStorage.getItem("chat_temp")!)
             : undefined,
         }),
       });
 
-      const data = await response.json();
+      let responseText = "Error getting reply from BUBUBAI.";
+      
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
+      }
+
+      try {
+        const data = await response.json();
+        responseText = data.text || responseText;
+      } catch (parseErr) {
+        throw new Error("Failed to parse response. The generation may have timed out.");
+      }
 
       const replyMsg: ChatMessage = {
         id: `m-model-${Date.now()}`,
         role: "model",
-        content: data.text || "Error getting reply from BuBuBai.",
+        content: responseText,
         timestamp: new Date(),
       };
 
@@ -423,17 +428,17 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
       setMessages(finalMessages);
       saveChatSession(finalMessages, targetChatId);
     } catch (error) {
-      console.error("Error communicating with BubuBai:", error);
+      console.error("Error communicating with BUBUBAI:", error);
       const offlineMsg: ChatMessage = {
         id: `m-model-fallback-${Date.now()}`,
         role: "model",
         content: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ BuBuBai — Server Busy
+⚡ Server Busy
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Our servers are currently at peak load.
 Please try again in a few moments. 🔄
 
-— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+— BUBUBAI
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
         timestamp: new Date(),
       };
@@ -448,21 +453,7 @@ Please try again in a few moments. 🔄
   const handleSendReply = async () => {
     if (!inputValue.trim() || isLoading) return;
 
-    if (dailyUsage.count >= 3) {
-      const limitReply: ChatMessage = {
-        id: `m-limit-${Date.now()}`,
-        role: "model",
-        content: `⚠️ **DAILY LIMIT REACHED**
-        
-You have used your daily limit of **3 chats** today. Please come back tomorrow to continue working on your creative coding projects!
-        
-— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, limitReply]);
-      setIsLoading(false);
-      return;
-    }
+    
 
     const userPrompt = inputValue;
     setInputValue("");
@@ -481,7 +472,7 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
     const updatedMessages = [...messages, newUserMsg];
     setMessages(updatedMessages);
     setIsLoading(true);
-    await incrementDailyUsage();
+    incrementDailyUsage();
     saveChatSession(updatedMessages);
 
     // Map conversation log for model memory context and prune for context window efficiency
@@ -501,18 +492,28 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
           message: userPrompt,
           history: historyPayload,
           method: selectedMethod,
-          temperature: localStorage.getItem("bububai_chat_temp")
-            ? parseFloat(localStorage.getItem("bububai_chat_temp")!)
+          
+          temperature: localStorage.getItem("chat_temp")
+            ? parseFloat(localStorage.getItem("chat_temp")!)
             : undefined,
         }),
       });
 
-      const data = await response.json();
+      let responseText = "No reply was returned.";
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
+      }
+      try {
+        const data = await response.json();
+        responseText = data.text || responseText;
+      } catch (e) {
+        throw new Error("Failed to parse response. The generation may have timed out.");
+      }
 
       const replyMsg: ChatMessage = {
         id: `m-model-${Date.now()}`,
         role: "model",
-        content: data.text || "No reply was returned.",
+        content: responseText,
         timestamp: new Date(),
       };
 
@@ -525,12 +526,12 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
         id: `m-model-fallback-${Date.now()}`,
         role: "model",
         content: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ BuBuBai — Server Busy
+⚡ Server Busy
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Our servers are currently at peak load.
 Please try again in a few moments. 🔄
 
-— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+— BUBUBAI
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
         timestamp: new Date(),
       };
@@ -750,7 +751,7 @@ Please try again in a few moments. 🔄
     const welcomeMsg: ChatMessage = {
       id: `m-welcome-${Date.now()}`,
       role: "model",
-      content: `Hey ${displayName}! 👋 I'm BuBuBai — elite AI for code, design & everything.\nWhat are we building today?`,
+      content: `Hey ${displayName}! 👋 I'm BUBUBAI — ready to help.\nWhat are we building today?`,
       timestamp: new Date(),
     };
     setMessages([welcomeMsg]);
@@ -760,21 +761,7 @@ Please try again in a few moments. 🔄
   const handleRegenerate = async () => {
     if (messages.length < 2 || isLoading) return;
 
-    if (dailyUsage.count >= 3) {
-      const limitReply: ChatMessage = {
-        id: `m-limit-${Date.now()}`,
-        role: "model",
-        content: `⚠️ **DAILY LIMIT REACHED**
-        
-You have used your daily limit of **3 chats** today. Please come back tomorrow to continue working on your creative coding projects!
-        
-— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, limitReply]);
-      setIsLoading(false);
-      return;
-    }
+    
 
     // Find last user message index
     let lastUserIndex = -1;
@@ -790,7 +777,7 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
       // Slice and trigger reply fetch again
       setMessages((prev) => prev.slice(0, lastUserIndex + 1));
       setIsLoading(true);
-      await incrementDailyUsage();
+      incrementDailyUsage();
 
       const historyPayload = trimHistoryToContextWindow(
         messages.slice(0, lastUserIndex).map((m) => ({
@@ -807,8 +794,9 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
           message: promptText,
           history: historyPayload,
           method: selectedMethod,
-          temperature: localStorage.getItem("bububai_chat_temp")
-            ? parseFloat(localStorage.getItem("bububai_chat_temp")!)
+          
+          temperature: localStorage.getItem("chat_temp")
+            ? parseFloat(localStorage.getItem("chat_temp")!)
             : undefined,
         }),
       })
@@ -827,12 +815,12 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
             id: `m-model-fallback-${Date.now()}`,
             role: "model",
             content: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ BuBuBai — Server Busy
+⚡ Server Busy
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Our servers are currently at peak load.
 Please try again in a few moments. 🔄
 
-— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+— BUBUBAI
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
             timestamp: new Date(),
           };
@@ -848,21 +836,7 @@ Please try again in a few moments. 🔄
   const handleSaveAndRegenerate = async (messageId: string) => {
     if (!editingText.trim() || isLoading) return;
 
-    if (dailyUsage.count >= 3) {
-      const limitReply: ChatMessage = {
-        id: `m-limit-${Date.now()}`,
-        role: "model",
-        content: `⚠️ **DAILY LIMIT REACHED**
-        
-You have used your daily limit of **3 chats** today. Please come back tomorrow to continue working on your creative coding projects!
-        
-— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, limitReply]);
-      setIsLoading(false);
-      return;
-    }
+    
 
     const newContent = editingText;
     setEditingMessageId(null);
@@ -882,7 +856,7 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
 
     setMessages(updatedMessages);
     setIsLoading(true);
-    await incrementDailyUsage();
+    incrementDailyUsage();
     saveChatSession(updatedMessages);
 
     // Prune history using context window prior to API call
@@ -899,17 +873,27 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
           message: newContent,
           history: contextHistory,
           method: selectedMethod,
-          temperature: localStorage.getItem("bububai_chat_temp")
-            ? parseFloat(localStorage.getItem("bububai_chat_temp")!)
+          
+          temperature: localStorage.getItem("chat_temp")
+            ? parseFloat(localStorage.getItem("chat_temp")!)
             : undefined,
         }),
       });
 
-      const data = await response.json();
+      let responseText = "No reply was returned.";
+      if (!response.ok) {
+        throw new Error(`Server returned status ${response.status}`);
+      }
+      try {
+        const data = await response.json();
+        responseText = data.text || responseText;
+      } catch (e) {
+        throw new Error("Failed to parse response. The generation may have timed out.");
+      }
       const replyMsg: ChatMessage = {
         id: `m-model-${Date.now()}`,
         role: "model",
-        content: data.text || "No reply was returned.",
+        content: responseText,
         timestamp: new Date(),
       };
 
@@ -922,12 +906,12 @@ You have used your daily limit of **3 chats** today. Please come back tomorrow t
         id: `m-model-fallback-${Date.now()}`,
         role: "model",
         content: `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ BuBuBai — Server Busy
+⚡ Server Busy
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Our servers are currently at peak load.
 Please try again in a few moments. 🔄
 
-— BuBuBai ULTRA ∞ · Powered by Gamura × Selvaranjan G
+— BUBUBAI
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
         timestamp: new Date(),
       };
@@ -966,7 +950,7 @@ Please try again in a few moments. 🔄
       md: "md",
     };
     const ext = extMap[language.toLowerCase()] || "txt";
-    const filename = `bububai_code.${ext}`;
+    const filename = `chat_code.${ext}`;
 
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -984,14 +968,14 @@ Please try again in a few moments. 🔄
     if (navigator.share) {
       navigator
         .share({
-          title: "BuBuBai AI Code Output",
+          title: "Code Output",
           text: text,
           url: window.location.href,
         })
         .catch((err) => console.log(err));
     } else {
       navigator.clipboard.writeText(text);
-      alert("AI code response link copied to clipboard for easy sharing!");
+      alert("Code response link copied to clipboard for easy sharing!");
     }
   };
 
@@ -1504,25 +1488,16 @@ Please try again in a few moments. 🔄
             <div className="w-6 h-6 rounded-md overflow-hidden bg-white shrink-0 border border-neutral-200">
               <img
                 src="https://lh3.googleusercontent.com/d/1YQ_yqbUkfjuIDrM6rH1IYThahwYLReZw"
-                alt="BuBuBai logo"
+                alt="App logo"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
             </div>
             <span className="font-sans font-semibold text-sm text-[#111110] tracking-tight">
-              BuBuBai
+              BUBUBAI
             </span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1">
-            {chatSummary && (
-              <span className="font-mono text-[9px] uppercase tracking-wider text-emerald-600 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-100 font-bold max-w-[150px] truncate">
-                {chatSummary}
-              </span>
-            )}
-            <span className={`font-mono text-[9px] uppercase tracking-wider px-2.5 py-0.5 rounded-full border font-bold ${dailyUsage.count >= 3 ? "text-red-100 bg-red-600 border-red-700" : "text-neutral-600 bg-neutral-100/80 border-neutral-200"}`}>
-              {Math.max(0, 3 - dailyUsage.count)}/3 CHATS REMAINING
-            </span>
-          </div>
+          
         </div>
 
         <div className="relative">
@@ -1554,6 +1529,17 @@ Please try again in a few moments. 🔄
                   <span>New Chat</span>
                 </button>
                 <div className="h-[1px] bg-[#ebebe8] w-full my-1" />
+                <button
+                  onClick={() => {
+                    setShowPopupMenu(false);
+                    setIsModesSheetOpen(true);
+                  }}
+                  className="flex items-center w-full px-4 py-2.5 text-sm font-semibold text-[#111110] hover:bg-[#f4f4f2] transition-colors gap-3 justify-start cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                  <span>Modes</span>
+                </button>
+                <div className="h-[1px] bg-[#ebebe8] w-full my-1" />
                 <a
                   href="/tester.html"
                   target="_blank"
@@ -1562,7 +1548,7 @@ Please try again in a few moments. 🔄
                   onClick={() => setShowPopupMenu(false)}
                 >
                   <Play className="w-4 h-4 stroke-[2.5] fill-emerald-600/20" />
-                  <span>BUBUBAI TESTER</span>
+                  <span>TESTER</span>
                 </a>
               </div>
             </>
@@ -1738,11 +1724,11 @@ Please try again in a few moments. 🔄
         {/* Animated Custom Typing Indicator */}
         {isLoading && (
           <div className="flex items-start gap-3.5 max-w-2xl mx-auto w-full select-none">
-            {/* Left BuBuBai avatar */}
+            {/* Left BUBUBAI avatar */}
             <div className="w-8 h-8 rounded-lg overflow-hidden bg-white shrink-0 border border-neutral-100 shadow-sm flex items-center justify-center animate-pulse">
               <img
                 src="https://lh3.googleusercontent.com/d/1YQ_yqbUkfjuIDrM6rH1IYThahwYLReZw"
-                alt="BuBuBai logo"
+                alt="App logo"
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
               />
@@ -1751,7 +1737,7 @@ Please try again in a few moments. 🔄
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-sans font-semibold text-sm text-[#111110] tracking-tight">
-                    BuBuBai is thinking
+                    BUBUBAI is typing
                   </span>
                   <div className="flex gap-1 items-center justify-center py-1">
                     <span
@@ -1789,16 +1775,6 @@ Please try again in a few moments. 🔄
       {/* ── BOTTOM REPLY ENTRY FORM matching CLAUDE APP screenshots ── */}
       <footer className="shrink-0 p-4 border-t border-[#f4f4f2] bg-white flex flex-col items-center justify-end w-full">
         <div className="max-w-2xl w-full flex flex-col space-y-3.5 px-1 md:px-0">
-          {/* Sub footnote directly above reply capsule input */}
-          <div className="flex items-center justify-between w-full text-[11px] text-neutral-400 select-none">
-            <div className="flex items-center gap-1.5">
-              <span>
-                BuBuBai is AI and can make mistakes. Please double-check
-                responses.
-              </span>
-            </div>
-          </div>
-
           {/* Interactive Input capsule layout */}
           <div className="relative flex items-center bg-[#f4f4f2] rounded-[28px] p-2 pl-3 border border-[#ebebe8] shadow-sm w-full min-h-[54px] overflow-hidden group">
             {isLoading && (
@@ -1822,11 +1798,11 @@ Please try again in a few moments. 🔄
             {/* Expansible prompt field resembling standard chat */}
             <textarea
               ref={textareaRef}
-              className={`flex-1 max-h-[120px] bg-transparent text-[#111110] font-sans text-[15px] focus:outline-none resize-none pt-2.5 pb-1 px-1 leading-normal select-text relative z-10 placeholder:text-neutral-400 ${dailyUsage.count >= 3 ? "opacity-50 cursor-not-allowed" : ""}`}
-              placeholder={dailyUsage.count >= 3 ? "Daily limit of 3 chats reached." : "Ask BuBuBai..."}
+              className="flex-1 max-h-[120px] bg-transparent text-[#111110] font-sans text-[15px] focus:outline-none resize-none pt-2.5 pb-1 px-1 leading-normal select-text relative z-10 placeholder:text-neutral-400"
+              placeholder="Type a message..."
               rows={1}
               value={inputValue}
-              disabled={dailyUsage.count >= 3}
+              disabled={false}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
             />
@@ -1835,9 +1811,9 @@ Please try again in a few moments. 🔄
             <button
               type="button"
               onClick={handleSendReply}
-              disabled={!inputValue.trim() || isLoading || dailyUsage.count >= 3}
+              disabled={!inputValue.trim() || isLoading}
               className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 relative z-10 overflow-hidden outline-none touch-manipulation tap-highlight-transparent ${
-                (inputValue.trim() || isLoading) && dailyUsage.count < 3
+                (inputValue.trim() || isLoading)
                   ? "bg-[#111110] text-white cursor-pointer group-focus-within:bg-emerald-600"
                   : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
               } ${isLoading ? "scale-90 opacity-80" : "hover:scale-105 active:scale-95"}`}
@@ -1870,6 +1846,13 @@ Please try again in a few moments. 🔄
           </div>
         </div>
       </footer>
+
+      <ModesSheet
+        isOpen={isModesSheetOpen}
+        onClose={() => setIsModesSheetOpen(false)}
+        activeModeId={activeModeId}
+        onApplyMode={(id) => setActiveModeId(id)}
+      />
     </div>
   );
 }

@@ -56,9 +56,7 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsAppLoading(false);
-    }, 1500);
+    setIsAppLoading(false);
 
     // Safety fallback: ensure loading screen is dismissed even if Firebase Auth is slow or fails silently
     const authTimer = setTimeout(() => {
@@ -69,10 +67,9 @@ export default function App() {
         }
         return isChecking;
       });
-    }, 4500);
+    }, 1500);
 
     return () => {
-      clearTimeout(timer);
       clearTimeout(authTimer);
     };
   }, []);

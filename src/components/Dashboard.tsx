@@ -71,6 +71,7 @@ export function Dashboard({
   const [drawerSearchQuery, setDrawerSearchQuery] = useState("");
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
+  const [gbSheetOpen, setGbSheetOpen] = useState(false);
   const [onAddAttachment, setOnAddAttachment] = useState<((text: string) => void) | null>(null);
   const [textValue, setTextValue] = useState("");
 
@@ -199,13 +200,13 @@ export function Dashboard({
 
   // Settings configurations
   const [chatTemp, setChatTemp] = useState(() =>
-    parseFloat(localStorage.getItem("bububai_chat_temp") || "0.7"),
+    parseFloat(localStorage.getItem("chat_temp") || "0.7"),
   );
   const [defaultModel, setDefaultModel] = useState(
-    () => localStorage.getItem("bububai_default_model") || "gemini-2.5-flash",
+    () => localStorage.getItem("chat_default_model") || "gemini-2.5-flash",
   );
   const [biometricBypass, setBiometricBypass] = useState(
-    () => localStorage.getItem("bububai_biometric_bypass") === "true",
+    () => localStorage.getItem("chat_biometric_bypass") === "true",
   );
 
   const [profileName, setProfileName] = useState("");
@@ -229,6 +230,7 @@ export function Dashboard({
   const [profileStatusMsg, setProfileStatusMsg] = useState("");
   const [profileErrorMsg, setProfileErrorMsg] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Synchronize edit states when profile opens or userProfile updates
   useEffect(() => {
@@ -488,7 +490,7 @@ export function Dashboard({
           } else {
             chatsList.push({
               id: docId,
-              title: data.title || "BUBUBAI Conversation",
+              title: data.title || "Conversation",
               updatedAt: updatedAtTime,
               messages: data.messages || [],
             });
@@ -536,7 +538,7 @@ export function Dashboard({
     el.style.height = Math.min(el.scrollHeight, 180) + "px";
   };
 
-  // Allow clicking a quick-select chip prompt to enter BubuBai Chat immediately
+  // Allow clicking a quick-select chip prompt to enter App Chat immediately
   const handleChipClick = (promptText: string) => {
     if (!promptText.trim()) {
       setTextValue("");
@@ -550,7 +552,7 @@ export function Dashboard({
     setActiveChatPrompt(promptText);
   };
 
-  // Triggers the beautiful full BubuBai Chat Page with the prompt
+  // Triggers the beautiful full App Chat Page with the prompt
   const handleSend = () => {
     if (!textValue.trim()) return;
     const promptToSend = textValue;
@@ -611,7 +613,7 @@ export function Dashboard({
         <div className="dr-top">
           <img
             src="https://lh3.googleusercontent.com/d/1YQ_yqbUkfjuIDrM6rH1IYThahwYLReZw"
-            alt="BuBuBai Logo"
+            alt="BUBUBAI Logo"
             referrerPolicy="no-referrer"
             style={{
               width: "26px",
@@ -621,7 +623,7 @@ export function Dashboard({
               objectFit: "cover",
             }}
           />
-          <span className="dr-logo">BuBuBai</span>
+          <span className="dr-logo">BUBUBAI</span>
         </div>
 
         <div className="dr-body">
@@ -807,25 +809,54 @@ export function Dashboard({
                           <span className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-300 group-hover:bg-emerald-500 shrink-0"></span>
                           <span className="truncate">{ch.title}</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              await runWithRetry(() =>
-                                deleteDoc(doc(db, "chats", ch.id)),
-                              );
-                              loadChatHistory();
-                            } catch (err) {
-                              console.error("Failed to manual delete:", err);
-                            }
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-650 transition-opacity cursor-pointer text-neutral-400"
-                          title="Delete session"
-                          style={{ background: "none", border: "none" }}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {confirmDeleteId === ch.id ? (
+                          <div className="flex gap-2 relative z-10 px-1 items-center">
+                            <span className="text-[10px] text-red-500 uppercase tracking-widest font-mono font-medium">Delete?</span>
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await runWithRetry(() =>
+                                    deleteDoc(doc(db, "chats", ch.id)),
+                                  );
+                                  setConfirmDeleteId(null);
+                                  loadChatHistory();
+                                } catch (err) {
+                                  console.error("Failed to manual delete:", err);
+                                  setConfirmDeleteId(null);
+                                }
+                              }}
+                              className="text-[10px] text-red-650 hover:text-red-700 uppercase tracking-wider font-mono font-bold"
+                            >
+                              Yes
+                            </button>
+                            <span className="text-neutral-300 text-[10px]">/</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(null);
+                              }}
+                              className="text-[10px] text-neutral-400 hover:text-neutral-600 uppercase tracking-wider font-mono"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDeleteId(ch.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity cursor-pointer text-neutral-400"
+                            title="Delete session"
+                            style={{ background: "none", border: "none" }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     ))}
 
@@ -897,7 +928,7 @@ export function Dashboard({
             >
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
-            BuBuBai
+            BUBUBAI
             <span className="badge">New</span>
           </a>
           <a
@@ -1054,7 +1085,7 @@ export function Dashboard({
           <div className="bg-white/10 rounded-lg p-1 flex items-center justify-center">
             <img
               src="https://lh3.googleusercontent.com/d/1ntyJZciZOZhsJz0q4kqlRv4-xpRd57ED"
-              alt="BuBuBai Logo"
+              alt="BUBUBAI Logo"
               className="h-8 w-auto object-contain rounded-sm"
               referrerPolicy="no-referrer"
             />
@@ -1145,7 +1176,7 @@ export function Dashboard({
           <div className="ghost-icon overflow-hidden bg-white">
             <img
               src="https://lh3.googleusercontent.com/d/1YQ_yqbUkfjuIDrM6rH1IYThahwYLReZw"
-              alt="BuBuBai Companion"
+              alt="BUBUBAI Companion"
               className="w-full h-full object-cover rounded-[14px]"
               referrerPolicy="no-referrer"
               onError={(e) => {
@@ -1171,31 +1202,23 @@ export function Dashboard({
             <textarea
               ref={textareaRef}
               id="ti"
-              className={`dsb-textarea ${dailyUsage.count >= 3 ? "opacity-50 cursor-not-allowed" : ""}`}
+              className="dsb-textarea"
               rows={1}
-              placeholder={dailyUsage.count >= 3 ? "Daily limit of 3 chats reached." : "Chat with BuBuBai..."}
+              placeholder="Chat with BUBUBAI..."
               value={textValue}
-              disabled={dailyUsage.count >= 3}
+              disabled={false}
               onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
             />
             <div className="box-foot" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div className="flex items-center text-[11px] font-mono select-none font-bold tracking-tight">
-                {dailyUsage.count >= 3 ? (
-                  <span className="text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1">
-                    0/3 CHATS REMAINING
-                  </span>
-                ) : (
-                  <span className="text-neutral-500 bg-neutral-50 border border-neutral-200/50 rounded-lg px-2.5 py-1">
-                    {3 - dailyUsage.count} OF 3 CHATS LEFT TODAY
-                  </span>
-                )}
+                <button onClick={() => setGbSheetOpen(true)} className="font-sans font-bold text-[13px] text-neutral-600 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-lg px-3 py-1 cursor-pointer transition-colors shadow-sm">GB</button>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   className="plus-btn"
                   title="Attach"
-                  disabled={dailyUsage.count >= 3}
+                  disabled={false}
                   onClick={() => setBottomSheetOpen(true)}
                 >
                   <svg
@@ -1212,7 +1235,7 @@ export function Dashboard({
                 <button
                   className="send-btn"
                   id="sb"
-                  disabled={!textValue.trim() || dailyUsage.count >= 3}
+                  disabled={!textValue.trim()}
                   onClick={handleSend}
                   title="Send"
                 >
@@ -1246,9 +1269,9 @@ export function Dashboard({
             </button>
             <button
               className="chip"
-              onClick={() => handleChipClick("What is BuBuBai?")}
+              onClick={() => handleChipClick("What is BUBUBAI?")}
             >
-              What is BuBuBai?
+              What is BUBUBAI?
             </button>
             <button
               className="chip"
@@ -1277,7 +1300,62 @@ export function Dashboard({
         </p>
       </main>
 
+      
+      {/* ── GB SHEET BACKDROP ── */}
+      {gbSheetOpen && (
+        <div
+          className="fixed inset-0 bg-[#111110]/15 backdrop-blur-[6px] z-[1000] transition-all duration-300"
+          onClick={() => setGbSheetOpen(false)}
+        />
+      )}
+
+      {/* ── GB SHEET (SLIDE BAR DOWN TO UP) ── */}
+      <div
+        className={`fixed bottom-0 left-0 right-0 bg-white rounded-t-[28px] z-[1010] border-t border-[#e2e2de] shadow-[0_-12px_44px_rgba(17,17,16,0.1)] transition-transform duration-300 ease-in-out transform ${
+          gbSheetOpen ? "translate-y-0" : "translate-y-full"
+        } h-[50vh] max-w-2xl mx-auto flex flex-col overflow-hidden`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#f4f4f2] h-[64px] shrink-0">
+          <div className="w-8 h-8" /> {/* Spacer */}
+          <span className="font-sans font-bold text-[18px] text-[#111110]">
+            GAMURA BUBUBAI
+          </span>
+          <button
+            type="button"
+            className="p-1 px-2 text-[#111110] hover:bg-[#f4f4f2] rounded-lg transition-colors cursor-pointer"
+            onClick={() => setGbSheetOpen(false)}
+            aria-label="Close"
+          >
+            <X className="w-6 h-6 stroke-[1.8]" />
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 pb-safe flex flex-col gap-3">
+          <a
+            href="https://gamura.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setGbSheetOpen(false)}
+            className="w-full text-center py-4 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-2xl transition-colors font-sans font-bold text-[16px] text-[#111110] cursor-pointer"
+          >
+            GAMURA
+          </a>
+          <a
+            href="https://gamuragalaxy.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setGbSheetOpen(false)}
+            className="w-full text-center py-4 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-2xl transition-colors font-sans font-bold text-[16px] text-[#111110] cursor-pointer"
+          >
+            GAMURA GALAXY
+          </a>
+        </div>
+      </div>
+      
       {/* ── BOTTOM SHEET BACKDROP ── */}
+
       {bottomSheetOpen && (
         <div
           className="fixed inset-0 bg-[#111110]/15 backdrop-blur-[6px] z-[990] transition-all duration-300"
@@ -1532,7 +1610,7 @@ export function Dashboard({
               <div className="flex items-center gap-2.5">
                 <img
                   src="https://lh3.googleusercontent.com/d/1YQ_yqbUkfjuIDrM6rH1IYThahwYLReZw"
-                  alt="BuBuBai Logo"
+                  alt="BUBUBAI Logo"
                   referrerPolicy="no-referrer"
                   className="w-8 h-8 rounded-lg object-cover"
                 />
@@ -1631,7 +1709,7 @@ export function Dashboard({
                               : "text-neutral-500 hover:text-neutral-900"
                           }`}
                         >
-                          BUBUBAI AI IMAGE
+                          AI IMAGE (Disabled)
                         </button>
                         <button
                           type="button"
@@ -1653,7 +1731,7 @@ export function Dashboard({
                         <div className="space-y-2.5 animate-fadeIn">
                           <p className="text-[10px] text-neutral-400 font-sans leading-relaxed">
                             Describe your vision below to forge a custom
-                            circular vector icon avatar using the BuBuBai model.
+                            circular vector icon avatar using the BUBUBAI model.
                           </p>
 
                           <div className="relative">
@@ -1971,7 +2049,7 @@ export function Dashboard({
                 )}
                 <div>
                   <h2 className="font-sans font-bold text-base text-[#111110] leading-none">
-                    {settingsView === "main" && "BuBuBai Settings"}
+                    {settingsView === "main" && "BUBUBAI Settings"}
                     {settingsView === "access" && "Access"}
                     {settingsView === "language" && "Language"}
                     {settingsView === "personalization" && "Personalization"}
@@ -2008,7 +2086,7 @@ export function Dashboard({
             <div className="space-y-3">
               {settingsView === "main" && (
                 <>
-                  {/* BuBuBai Account */}
+                  {/* BUBUBAI Account */}
                   <div className="bg-neutral-50 rounded-[20px] overflow-hidden border border-neutral-100">
                     <div className="flex items-center gap-4 p-4 bg-white">
                       <Mail className="w-[22px] h-[22px] text-neutral-800" />
@@ -2418,7 +2496,7 @@ export function Dashboard({
               {settingsView === "apps" && (
                 <div className="bg-neutral-50 rounded-[24px] overflow-hidden border border-neutral-100 py-1">
                   {[
-                    { id: "core", name: "BuBuBai Core" },
+                    { id: "core", name: "BUBUBAI Core" },
                     { id: "gamura", name: "Gamura" },
                     { id: "galaxy", name: "Gamura Galaxy" },
                   ].map((app) => (
@@ -2452,7 +2530,7 @@ export function Dashboard({
                     </div>
                   ))}
                   <div className="p-4 bg-neutral-50 text-xs text-neutral-500 leading-relaxed">
-                    BuBuBai can access information from connected apps, based on
+                    BUBUBAI can access information from connected apps, based on
                     what you're authorized to view.
                   </div>
                 </div>
