@@ -18,6 +18,7 @@ import {
   Volume2,
   FileCode,
   Pencil,
+  FileText,
   Download,
   Sun,
   Moon,
@@ -35,6 +36,12 @@ import {
 } from "firebase/firestore";
 import { ModesSheet, MODES } from "./ModesSheet";
 
+export interface ChatAttachment {
+  type: string;
+  name: string;
+  data: string; // Base64 url
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "model";
@@ -42,6 +49,7 @@ export interface ChatMessage {
   timestamp: Date;
   isLiked?: boolean;
   isDisliked?: boolean;
+  attachments?: ChatAttachment[];
 }
 
 /**
@@ -49,11 +57,11 @@ export interface ChatMessage {
  * It estimates tokens (1 token ≈ 4 characters) and retains the most recent messages.
  */
 export function trimHistoryToContextWindow(
-  messages: { role: string; content: string }[],
+  messages: { role: string; content: string; attachments?: ChatAttachment[] }[],
   maxTokens: number = 6000,
-): { role: string; content: string }[] {
+): { role: string; content: string; attachments?: ChatAttachment[] }[] {
   let estimatedTotalTokens = 0;
-  const pruned: { role: string; content: string }[] = [];
+  const pruned: { role: string; content: string; attachments?: ChatAttachment[] }[] = [];
 
   // Iterate from newest to oldest
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -85,7 +93,7 @@ interface ChatViewProps {
     username?: string;
   } | null;
   onBack: () => void;
-  onOpenBottomSheet: (appendFn: (text: string) => void) => void;
+  onOpenBottomSheet: (appendFn: (attachments: ChatAttachment[]) => void) => void;
 }
 
 
@@ -106,6 +114,7 @@ export function ChatView({
 }: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [inputAttachments, setInputAttachments] = useState<ChatAttachment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeSpeechId, setActiveSpeechId] = useState<string | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -115,6 +124,7 @@ export function ChatView({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
   const [showPopupMenu, setShowPopupMenu] = useState<boolean>(false);
+  const [activePreviewAttachment, setActivePreviewAttachment] = useState<ChatAttachment | null>(null);
   
   // Modes state
   const [isModesSheetOpen, setIsModesSheetOpen] = useState(false);
@@ -129,6 +139,128 @@ export function ChatView({
     return "ultra";
   });
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>({});
+
+  // Drag and drop / Attaching states
+  const [isDragging, setIsDragging] = useState(false);
+  const [isAttachingFiles, setIsAttachingFiles] = useState(false);
+  const [attachingProgress, setAttachingProgress] = useState<number | null>(null);
+
+  const [typingStatus, setTypingStatus] = useState<string>("BUBUBAI is translating request");
+
+  useEffect(() => {
+    if (!isLoading) {
+      setTypingStatus("BUBUBAI is thinking");
+      return;
+    }
+    
+    const statuses = [
+      "BUBUBAI is connecting",
+      "BUBUBAI is thinking",
+      "BUBUBAI is researching solutions",
+      "BUBUBAI is drafting code blocks",
+      "BUBUBAI is typing answer",
+      "BUBUBAI is polishing microdetails"
+    ];
+    let index = 0;
+    setTypingStatus(statuses[0]);
+
+    const interval = setInterval(() => {
+      index = (index + 1) % statuses.length;
+      setTypingStatus(statuses[index]);
+    }, 1800);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  const handleFiles = async (files: File[]) => {
+    if (!files.length) return;
+    
+    if (files.length + inputAttachments.length > 6) {
+      alert("You can only add up to 6 files per message.");
+      return;
+    }
+
+    setIsAttachingFiles(true);
+    setAttachingProgress(15);
+
+    const readAsBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
+
+    try {
+      const newAttachments: ChatAttachment[] = [];
+      const total = files.length;
+      for (let i = 0; i < total; i++) {
+        const f = files[i];
+        const data = await readAsBase64(f);
+        newAttachments.push({
+          type: f.type || "application/octet-stream",
+          name: f.name,
+          data
+        });
+        const currentProgress = Math.round(((i + 1) / total) * 80) + 15;
+        setAttachingProgress(currentProgress);
+      }
+      
+      setInputAttachments((prev) => {
+        const next = [...prev, ...newAttachments];
+        return next.slice(0, 6);
+      });
+    } catch (err) {
+      console.error("Error reading file(s)", err);
+    } finally {
+      setAttachingProgress(100);
+      setTimeout(() => {
+        setIsAttachingFiles(false);
+        setAttachingProgress(null);
+      }, 600);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { clientX, clientY } = e;
+    if (
+      clientX < rect.left ||
+      clientX >= rect.right ||
+      clientY < rect.top ||
+      clientY >= rect.bottom
+    ) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filesList = Array.from(e.dataTransfer.files) as File[];
+      handleFiles(filesList);
+    }
+  };
 
   const [currentChatId, setCurrentChatId] = useState<string>(() => {
     return (
@@ -275,6 +407,7 @@ export function ChatView({
         m.timestamp instanceof Date
           ? m.timestamp.toISOString()
           : (m.timestamp as any).toString(),
+      attachments: m.attachments || [],
     }));
 
     const activeId = targetChatId || currentChatId;
@@ -326,6 +459,7 @@ export function ChatView({
             role: m.role,
             content: m.content,
             timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+            attachments: m.attachments || [],
           }),
         );
         setMessages(loadedMessages);
@@ -374,10 +508,14 @@ export function ChatView({
     }
   }, [activeChatId, initialPrompt]);
 
-  // Scroll to bottom whenever messages or loading state changes
+  // Scroll to bottom whenever messages, loading state, or attached file counts change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading]);
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [messages, isLoading, inputAttachments.length]);
 
   const handleNewConversation = async (
     promptText: string,
@@ -390,7 +528,9 @@ export function ChatView({
       role: "user",
       content: promptText,
       timestamp: new Date(),
+      attachments: inputAttachments,
     };
+    setInputAttachments([]);
 
     const freshMessages = [userMsg];
     setMessages(freshMessages);
@@ -407,6 +547,7 @@ export function ChatView({
           history: [],
           usageCount: dailyUsage.count + 1,
           username: displayName || 'Developer',
+          attachments: userMsg.attachments,
         }),
       });
 
@@ -473,7 +614,9 @@ Please try again in a few moments. 🔄
       role: "user",
       content: userPrompt,
       timestamp: new Date(),
+      attachments: inputAttachments,
     };
+    setInputAttachments([]);
 
     const updatedMessages = [...messages, newUserMsg];
     setMessages(updatedMessages);
@@ -486,6 +629,7 @@ Please try again in a few moments. 🔄
       messages.map((m) => ({
         role: m.role,
         content: m.content,
+        attachments: m.attachments,
       })),
       6000,
     );
@@ -499,6 +643,7 @@ Please try again in a few moments. 🔄
           history: historyPayload,
           usageCount: dailyUsage.count + 1,
           username: displayName || 'Developer',
+          attachments: newUserMsg.attachments,
         }),
       });
 
@@ -778,6 +923,7 @@ Please try again in a few moments. 🔄
 
     if (lastUserIndex !== -1) {
       const promptText = messages[lastUserIndex].content;
+      const retryAttachments = messages[lastUserIndex].attachments;
       // Slice and trigger reply fetch again
       setMessages((prev) => prev.slice(0, lastUserIndex + 1));
       setIsLoading(true);
@@ -787,6 +933,7 @@ Please try again in a few moments. 🔄
         messages.slice(0, lastUserIndex).map((m) => ({
           role: m.role,
           content: m.content,
+          attachments: m.attachments, 
         })),
         6000,
       );
@@ -799,6 +946,7 @@ Please try again in a few moments. 🔄
           history: historyPayload,
           usageCount: dailyUsage.count + 1,
           username: displayName || 'Developer',
+          attachments: retryAttachments,
         }),
       })
         .then((res) => res.json())
@@ -862,7 +1010,7 @@ Please try again in a few moments. 🔄
 
     // Prune history using context window prior to API call
     const contextHistory = trimHistoryToContextWindow(
-      truncatedHistory.map((m) => ({ role: m.role, content: m.content })),
+      truncatedHistory.map((m) => ({ role: m.role, content: m.content, attachments: m.attachments })),
       6000,
     );
 
@@ -875,6 +1023,7 @@ Please try again in a few moments. 🔄
           history: contextHistory,
           usageCount: dailyUsage.count + 1,
           username: displayName || 'Developer',
+          attachments: targetMsg.attachments,
         }),
       });
 
@@ -1469,7 +1618,36 @@ Please try again in a few moments. 🔄
   };
 
   return (
-    <div className="fixed inset-0 bg-[#ffffff] z-[950] flex flex-col h-full w-full">
+    <div 
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="fixed inset-0 bg-[#ffffff] z-[950] flex flex-col h-full w-full relative"
+    >
+      {/* Dragging Overlay Backdrop */}
+      <AnimatePresence>
+        {isDragging && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-white/90 backdrop-blur-md z-[1500] flex flex-col items-center justify-center border-4 border-dashed border-emerald-500/40 m-4 rounded-3xl pointer-events-none select-none transition-all duration-300"
+          >
+            <div className="flex flex-col items-center justify-center p-8 text-center max-w-md space-y-4">
+              <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-sm animate-bounce">
+                <Download className="w-8 h-8 stroke-[2]" />
+              </div>
+              <h3 className="font-sans text-xl font-bold text-[#111110]">
+                Release files to attach
+              </h3>
+              <p className="font-sans text-xs text-neutral-500 leading-relaxed font-semibold">
+                Drag and drop your images or documents right here to add them to your BUBUBAI chat. (Up to 6 files max)
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* ── TOP NAVIGATION HEADER ── */}
       <header className="h-[64px] border-b border-[#f4f4f2] px-6 flex items-center justify-between shrink-0 bg-white">
         <button
@@ -1592,21 +1770,70 @@ Please try again in a few moments. 🔄
                       </div>
                     </div>
                   ) : (
-                    // Regular user message pill with edit trigger on hover
-                    <div className="flex items-center gap-2">
+                    // Regular user message pill containing text AND attachments inside a single gorgeous, cohesive compound background
+                    <div className="flex items-center gap-2 max-w-full">
                       <button
                         type="button"
                         onClick={() => {
                           setEditingMessageId(msg.id);
                           setEditingText(msg.content);
                         }}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-all cursor-pointer"
+                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-700 transition-all cursor-pointer shrink-0"
                         title="Edit prompt"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <div className="font-sans font-bold text-xs uppercase tracking-widest bg-[#f4f4f2] border border-[#ebebe8] text-[#111110] px-4 py-2.5 rounded-[18px] shadow-sm select-text">
-                        {msg.content}
+
+                      <div className="bg-[#f4f4f2] border border-[#ebebe8] text-[#111110] rounded-[22px] shadow-sm overflow-hidden select-text break-words max-w-xs md:max-w-md flex flex-col">
+                        {/* Prompt text inside bubble */}
+                        {msg.content && msg.content.trim() !== "" && (
+                          <div className="font-sans font-bold text-xs uppercase tracking-widest px-4 py-3 pb-2 select-text">
+                            {msg.content}
+                          </div>
+                        )}
+
+                        {/* Divider if we have both text and attachments */}
+                        {msg.content && msg.content.trim() !== "" && msg.attachments && msg.attachments.length > 0 && (
+                          <div className="h-[1px] bg-[#ebebe8]/70 w-full" />
+                        )}
+
+                        {/* Attachments grid inside bubble */}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="bg-[#f4f4f2] p-2 flex flex-wrap gap-2 justify-start">
+                            {msg.attachments.map((att, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => setActivePreviewAttachment(att)}
+                                className="relative rounded-[14px] overflow-hidden border border-[#ebebe8] bg-[#ffffff] p-1.5 flex items-center gap-2.5 max-w-[200px] cursor-pointer hover:bg-neutral-50 active:scale-98 transition-all duration-150 shadow-2xs select-none shrink-0"
+                              >
+                                {att.type.startsWith("image/") ? (
+                                  <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-neutral-100 bg-neutral-50">
+                                    <img
+                                      src={`data:${att.type};base64,${att.data}`}
+                                      alt={att.name}
+                                      className="w-full h-full object-cover"
+                                      onLoad={() => {
+                                        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="w-10 h-10 rounded-lg bg-neutral-100 flex items-center justify-center shrink-0 text-neutral-400 border border-neutral-150">
+                                    <FileText className="w-[18px] h-[18px] text-neutral-500" />
+                                  </div>
+                                )}
+                                <div className="flex flex-col min-w-0 pr-1 text-left">
+                                  <span className="font-sans text-[11px] font-bold text-neutral-850 truncate max-w-[100px]" title={att.name}>
+                                    {att.name}
+                                  </span>
+                                  <span className="font-sans text-[9px] text-neutral-400 uppercase tracking-wider font-semibold">
+                                    {att.type.split("/")[1] || "doc"}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1734,8 +1961,8 @@ Please try again in a few moments. 🔄
             <div className="flex-1 space-y-3 bg-neutral-50 border border-neutral-100 rounded-2xl p-4 shadow-sm max-w-md">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-sans font-semibold text-sm text-[#111110] tracking-tight">
-                    BUBUBAI is typing
+                  <span className="font-sans font-semibold text-sm text-[#111110] tracking-tight min-w-[200px]">
+                    {typingStatus}
                   </span>
                   <div className="flex gap-1 items-center justify-center py-1">
                     <span
@@ -1772,26 +1999,111 @@ Please try again in a few moments. 🔄
 
       {/* ── BOTTOM REPLY ENTRY FORM matching CLAUDE APP screenshots ── */}
       <footer className="shrink-0 p-4 border-t border-[#f4f4f2] bg-white flex flex-col items-center justify-end w-full">
-        <div className="max-w-2xl w-full flex flex-col space-y-3.5 px-1 md:px-0">
+        <div className="max-w-2xl w-full flex flex-col space-y-3 px-1 md:px-0">
+          
+          {/* Active input attachments thumbnail preview list with removal button */}
+          <AnimatePresence>
+            {inputAttachments.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                className="w-full flex flex-wrap gap-2.5 p-3 bg-neutral-50 border border-[#ebebe8]/60 rounded-2xl max-h-[160px] overflow-y-auto mb-1 shadow-sm"
+              >
+                {inputAttachments.map((att, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    className="relative shrink-0 w-[72px] h-[72px] rounded-xl overflow-hidden border border-[#ebebe8] bg-white shadow-xs group flex items-center justify-center p-0.5"
+                  >
+                    {att.type.startsWith("image/") ? (
+                      <img
+                        src={`data:${att.type};base64,${att.data}`}
+                        alt={att.name}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-neutral-50 rounded-lg flex flex-col items-center justify-center text-[9px] text-[#111110] font-sans font-medium text-center p-1 select-none">
+                        <div className="w-7 h-7 rounded-full bg-[#f4f4f2] flex items-center justify-center mb-1 text-neutral-800">
+                          <FileText className="w-4 h-4 text-neutral-500" />
+                        </div>
+                        <span className="truncate w-full font-bold px-0.5">{att.name}</span>
+                      </div>
+                    )}
+                    
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInputAttachments((prev) => prev.filter((_, idx) => idx !== i));
+                      }}
+                      className="absolute top-1 right-1 bg-black/60 hover:bg-black text-white hover:text-rose-400 rounded-full w-[22px] h-[22px] flex items-center justify-center cursor-pointer shadow-sm transition-colors duration-150 border border-white/20"
+                      title="Remove attachment"
+                    >
+                      <X className="w-3 h-3 stroke-[3]" />
+                    </button>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Interactive Input capsule layout */}
           <div className="relative flex items-center bg-[#f4f4f2] rounded-[28px] p-2 pl-3 border border-[#ebebe8] shadow-sm w-full min-h-[54px] overflow-hidden group">
             {isLoading && (
               <div className="absolute left-[-100%] top-0 bottom-0 bg-gradient-to-r from-transparent via-[#0ea872]/20 to-transparent w-[200%] animate-[ripple_2s_linear_infinite]" />
             )}
 
-            {/* White round Plus Button that opens Bottom Sheet slide overlay info trigger */}
-            <button
-              type="button"
-              onClick={() => {
-                onOpenBottomSheet((text) => {
-                  setInputValue((prev) => prev + (prev ? " " : "") + text + " ");
-                });
-              }}
-              className="w-10 h-10 rounded-full bg-white text-[#111110] border border-[#ebebe8] shadow-sm flex items-center justify-center shrink-0 cursor-pointer hover:bg-neutral-50 active:bg-neutral-100 transition-all mr-2 relative z-10"
-              title="Add attachment"
-            >
-              <Plus className="w-[19px] h-[19px] stroke-[2.3]" />
-            </button>
+            {/* Circular Spinner OR White round Plus Button */}
+            {isAttachingFiles ? (
+              <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm flex items-center justify-center shrink-0 cursor-not-allowed transition-all mr-2 relative z-10 animate-pulse">
+                <div className="relative flex items-center justify-center">
+                  <div className="w-6 h-6 border-[2.5px] border-emerald-500/20 border-t-emerald-600 rounded-full animate-spin" />
+                  <span className="absolute text-[8px] font-sans font-bold leading-none">
+                    {attachingProgress !== null ? `${attachingProgress}%` : "..."}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenBottomSheet((attachments) => {
+                    // Trigger successful handling visual loading to show perfect progress indicator
+                    setIsAttachingFiles(true);
+                    setAttachingProgress(25);
+                    setTimeout(() => setAttachingProgress(75), 180);
+                    setTimeout(() => {
+                      setAttachingProgress(100);
+                      setInputAttachments((prev) => {
+                        const next = [...prev, ...attachments];
+                        return next.slice(0, 6);
+                      });
+                    }, 350);
+                    setTimeout(() => {
+                      setIsAttachingFiles(false);
+                      setAttachingProgress(null);
+                    }, 750);
+                  });
+                }}
+                className="w-10 h-10 rounded-full bg-white text-[#111110] border border-[#ebebe8] shadow-sm flex items-center justify-center shrink-0 cursor-pointer hover:bg-neutral-50 active:bg-neutral-100 transition-all mr-2 relative z-10"
+                title="Add attachment"
+              >
+                <Plus className="w-[19px] h-[19px] stroke-[2.3]" />
+              </button>
+            )}
+
+            {/* Success handler visual progress bar at the very bottom of the capsule inputs */}
+            {isAttachingFiles && attachingProgress !== null && (
+              <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-emerald-100 overflow-hidden z-20">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-200 ease-out"
+                  style={{ width: `${attachingProgress}%` }}
+                />
+              </div>
+            )}
 
             {/* Expansible prompt field resembling standard chat */}
             <textarea
@@ -1809,9 +2121,9 @@ Please try again in a few moments. 🔄
             <button
               type="button"
               onClick={handleSendReply}
-              disabled={!inputValue.trim() || isLoading}
+              disabled={(!inputValue.trim() && inputAttachments.length === 0) || isLoading}
               className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 relative z-10 overflow-hidden outline-none touch-manipulation tap-highlight-transparent ${
-                (inputValue.trim() || isLoading)
+                (inputValue.trim() || inputAttachments.length > 0)
                   ? "bg-[#111110] text-white cursor-pointer group-focus-within:bg-emerald-600"
                   : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
               } ${isLoading ? "scale-90 opacity-80" : "hover:scale-105 active:scale-95"}`}
@@ -1844,6 +2156,76 @@ Please try again in a few moments. 🔄
           </div>
         </div>
       </footer>
+
+      {/* ── ATTACHMENT PREVIEW OVERLAY MODAL ── */}
+      <AnimatePresence>
+        {activePreviewAttachment && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-[#111110]/80 backdrop-blur-md z-[2000] flex flex-col items-center justify-center p-4 select-none"
+            onClick={() => setActivePreviewAttachment(null)}
+          >
+            <div className="absolute top-4 right-4 flex items-center gap-3">
+              <a
+                href={`data:${activePreviewAttachment.type};base64,${activePreviewAttachment.data}`}
+                download={activePreviewAttachment.name}
+                onClick={(e) => e.stopPropagation()}
+                className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer backdrop-blur-sm"
+                title="Download file"
+              >
+                <Download className="w-5 h-5" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setActivePreviewAttachment(null)}
+                className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all cursor-pointer backdrop-blur-sm"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="max-w-4xl max-h-[80vh] w-full flex flex-col items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {activePreviewAttachment.type.startsWith("image/") ? (
+                <img
+                  src={`data:${activePreviewAttachment.type};base64,${activePreviewAttachment.data}`}
+                  alt={activePreviewAttachment.name}
+                  className="max-h-[70vh] max-w-full rounded-2xl object-contain shadow-2xl border border-white/10"
+                />
+              ) : (
+                <div className="bg-white border border-[#e2e2de] rounded-3xl p-8 max-w-md w-full flex flex-col items-center text-center shadow-2xl">
+                  <div className="w-16 h-16 rounded-2xl bg-[#f4f4f2] text-neutral-800 flex items-center justify-center mb-4">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <h3 className="font-sans text-lg font-bold text-neutral-800 mb-1 truncate w-full px-4">
+                    {activePreviewAttachment.name}
+                  </h3>
+                  <p className="font-sans text-xs text-neutral-400 capitalize mb-6">
+                    {activePreviewAttachment.type || "unknown binary document"}
+                  </p>
+                  
+                  <a
+                    href={`data:${activePreviewAttachment.type};base64,${activePreviewAttachment.data}`}
+                    download={activePreviewAttachment.name}
+                    className="w-full py-3 px-6 rounded-xl bg-[#111110] text-white hover:bg-neutral-800 font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Document
+                  </a>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ModesSheet
         isOpen={isModesSheetOpen}

@@ -29,7 +29,7 @@ import {
   ToggleRight,
   ArrowLeft,
 } from "lucide-react";
-import { ChatView } from "./ChatView";
+import { ChatView, ChatAttachment } from "./ChatView";
 import { db, runWithRetry } from "../firebase";
 import {
   collection,
@@ -72,11 +72,57 @@ export function Dashboard({
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
   const [gbSheetOpen, setGbSheetOpen] = useState(false);
-  const [onAddAttachment, setOnAddAttachment] = useState<((text: string) => void) | null>(null);
+  const [onAddAttachment, setOnAddAttachment] = useState<((attachments: ChatAttachment[]) => void) | null>(null);
   const [textValue, setTextValue] = useState("");
 
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeChatPrompt, setActiveChatPrompt] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileInputAccept, setFileInputAccept] = useState<string>("*/*");
+  const [fileInputCapture, setFileInputCapture] = useState<string | undefined>(undefined);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []) as File[];
+    if (!files.length) return;
+    
+    // The user can add 6 files per chat, wait actually just limit to 6
+    if (files.length > 6) {
+      alert("You can only add up to 6 files per message.");
+      return;
+    }
+
+    const readAsBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
+
+    try {
+      const attachments: ChatAttachment[] = await Promise.all(
+        files.map(async (f) => ({
+          type: f.type || "application/octet-stream",
+          name: f.name,
+          data: await readAsBase64(f)
+        }))
+      );
+
+      if (onAddAttachment) {
+        onAddAttachment(attachments);
+      }
+    } catch (error) {
+      console.error("Error reading files", error);
+    }
+    
+    setBottomSheetOpen(false);
+  };
+
 
   const [historyChats, setHistoryChats] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -1354,6 +1400,7 @@ export function Dashboard({
         </div>
       </div>
       
+      <input type="file" ref={fileInputRef} accept={fileInputAccept} capture={fileInputCapture as any} multiple onChange={handleFileSelect} className="hidden" />
       {/* ── BOTTOM SHEET BACKDROP ── */}
 
       {bottomSheetOpen && (
@@ -1392,15 +1439,10 @@ export function Dashboard({
             <button
               type="button"
               onClick={() => {
-                if (onAddAttachment) {
-                  onAddAttachment("[Camera Photo]");
-                } else {
-                  setTextValue(
-                    (prev) => prev + (prev ? " " : "") + "[Camera Photo] ",
-                  );
-                }
-                setBottomSheetOpen(false);
-              }}
+    setFileInputAccept("image/*");
+    setFileInputCapture("environment");
+    setTimeout(() => fileInputRef.current?.click(), 0);
+  }}
               className="flex flex-col items-center justify-center border-[1.5px] border-[#e2e2de] rounded-[20px] p-5 py-6 bg-white hover:bg-[#f4f4f2]/60 active:bg-[#f4f4f2] cursor-pointer transition-all duration-200 group"
             >
               <div className="w-12 h-12 rounded-full bg-[#f4f4f2] text-[#111110] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
@@ -1414,15 +1456,10 @@ export function Dashboard({
             <button
               type="button"
               onClick={() => {
-                if (onAddAttachment) {
-                  onAddAttachment("[Recent Photo]");
-                } else {
-                  setTextValue(
-                    (prev) => prev + (prev ? " " : "") + "[Recent Photo] ",
-                  );
-                }
-                setBottomSheetOpen(false);
-              }}
+    setFileInputAccept("image/*");
+    setFileInputCapture(undefined);
+    setTimeout(() => fileInputRef.current?.click(), 0);
+  }}
               className="flex flex-col items-center justify-center border-[1.5px] border-[#e2e2de] rounded-[20px] p-5 py-6 bg-white hover:bg-[#f4f4f2]/60 active:bg-[#f4f4f2] cursor-pointer transition-all duration-200 group"
             >
               <div className="w-12 h-12 rounded-full bg-[#f4f4f2] text-[#111110] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">
@@ -1436,15 +1473,10 @@ export function Dashboard({
             <button
               type="button"
               onClick={() => {
-                if (onAddAttachment) {
-                  onAddAttachment("[Document File]");
-                } else {
-                  setTextValue(
-                    (prev) => prev + (prev ? " " : "") + "[Document File] ",
-                  );
-                }
-                setBottomSheetOpen(false);
-              }}
+    setFileInputAccept("*/*");
+    setFileInputCapture(undefined);
+    setTimeout(() => fileInputRef.current?.click(), 0);
+  }}
               className="flex flex-col items-center justify-center border-[1.5px] border-[#e2e2de] rounded-[20px] p-5 py-6 bg-white hover:bg-[#f4f4f2]/60 active:bg-[#f4f4f2] cursor-pointer transition-all duration-200 group"
             >
               <div className="w-12 h-12 rounded-full bg-[#f4f4f2] text-[#111110] flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200">

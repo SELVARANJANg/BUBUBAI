@@ -4,7 +4,8 @@ import path from "path";
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // API route
 app.get("/api/health", (req, res) => {
@@ -13,8 +14,19 @@ app.get("/api/health", (req, res) => {
 
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let ai: GoogleGenAI | null = null;
+
+function getAiClient() {
+  if (!ai) {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      console.warn("GEMINI_API_KEY is not set. AI features will fail.");
+      return null;
+    }
+    ai = new GoogleGenAI({ apiKey: key });
+  }
+  return ai;
+}
 
 // System prompt for BUBUBAI
 const SYSTEM_PROMPT = `You are BUBUBAI — an elite AI coding assistant and intelligent companion built exclusively for the BUBUBAI platform (bububai.vercel.app), a product under the GAMURA ecosystem.
@@ -141,7 +153,7 @@ Each user is allowed exactly 3 messages per 24-hour period.
 
 app.post("/api/bububai/chat", async (req, res) => {
   try {
-    const { message, history, usageCount, username } = req.body;
+    const { message, history, usageCount, username, attachments } = req.body;
     const name = username || "Developer";
 
     if (usageCount >= 4) {
@@ -150,10 +162,26 @@ app.post("/api/bububai/chat", async (req, res) => {
     
     let contents = [];
     if (history && history.length > 0) {
-      contents = history.map((msg: any) => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }],
-      }));
+      contents = history.map((msg: any) => {
+        const p: any[] = [];
+        if (msg.attachments && Array.isArray(msg.attachments)) {
+          msg.attachments.forEach((att: any) => {
+            p.push({
+              inlineData: {
+                data: att.data,
+                mimeType: att.type
+              }
+            });
+          });
+        }
+        if (msg.content && msg.content.trim() !== "") {
+          p.push({ text: msg.content });
+        }
+        return {
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: p,
+        };
+      });
     }
     
     let finalMessage = message;
@@ -161,14 +189,34 @@ app.post("/api/bububai/chat", async (req, res) => {
       finalMessage = message + `\n\n[SYSTEM CRITICAL OBLIGATION: This is the user's 3rd and final message for today. You MUST respond fully to their request, and then you MUST directly append EXACTLY this note at the end of your message (before your **bububai** signature): "⚠️ You've used all 3 of your daily messages. Your limit resets in 24 hours. See you tomorrow, ${name}! 🚀"]`;
     }
 
+    const currentParts: any[] = [];
+    if (attachments && Array.isArray(attachments)) {
+      attachments.forEach((att: any) => {
+        currentParts.push({
+          inlineData: {
+            data: att.data,
+            mimeType: att.type
+          }
+        });
+      });
+    }
+    if (finalMessage && finalMessage.trim() !== "") {
+      currentParts.push({ text: finalMessage });
+    }
+
     contents.push({
       role: 'user',
-      parts: [{ text: finalMessage }],
+      parts: currentParts,
     });
 
     const currentSystemPrompt = SYSTEM_PROMPT.replace(/\[Username\]/g, name);
 
-    const response = await ai.models.generateContent({
+    const aiClient = getAiClient();
+    if (!aiClient) {
+      return res.json({ text: "⚡ SYSTEM ERROR: API Key missing. Please configure GEMINI_API_KEY in your environment to use AI features.\n\n**bububai**" });
+    }
+
+    const response = await aiClient.models.generateContent({
       model: "gemini-2.5-flash",
       contents,
       config: {
