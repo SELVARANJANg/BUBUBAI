@@ -1,11 +1,26 @@
 import express from "express";
 import path from "path";
+import dotenv from "dotenv";
+
+// Load dotenv environment variables
+dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+// Request normalization middleware to guarantee full path routing compatibility on Vercel
+app.use((req, res, next) => {
+  if (req.url.includes("/bububai/")) {
+    const idx = req.url.indexOf("/bububai/");
+    req.url = "/api" + req.url.substring(idx);
+  } else if (req.url.includes("/health")) {
+    req.url = "/api/health";
+  }
+  next();
+});
 
 // API route
 app.get("/api/health", (req, res) => {
@@ -23,7 +38,14 @@ function getAiClient() {
       console.warn("GEMINI_API_KEY is not set. AI features will fail.");
       return null;
     }
-    ai = new GoogleGenAI({ apiKey: key });
+    ai = new GoogleGenAI({ 
+      apiKey: key,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
   }
   return ai;
 }
@@ -161,21 +183,27 @@ app.post("/api/bububai/chat", async (req, res) => {
     }
     
     let contents = [];
-    if (history && history.length > 0) {
+    if (history && Array.isArray(history) && history.length > 0) {
       contents = history.map((msg: any) => {
         const p: any[] = [];
         if (msg.attachments && Array.isArray(msg.attachments)) {
           msg.attachments.forEach((att: any) => {
-            p.push({
-              inlineData: {
-                data: att.data,
-                mimeType: att.type
-              }
-            });
+            if (att && att.data && att.type) {
+              p.push({
+                inlineData: {
+                  data: att.data,
+                  mimeType: att.type
+                }
+              });
+            }
           });
         }
         if (msg.content && msg.content.trim() !== "") {
           p.push({ text: msg.content });
+        }
+        // Satisfy Gemini API validation structure (parts array must not be empty)
+        if (p.length === 0) {
+          p.push({ text: " " });
         }
         return {
           role: msg.role === 'user' ? 'user' : 'model',
@@ -192,16 +220,23 @@ app.post("/api/bububai/chat", async (req, res) => {
     const currentParts: any[] = [];
     if (attachments && Array.isArray(attachments)) {
       attachments.forEach((att: any) => {
-        currentParts.push({
-          inlineData: {
-            data: att.data,
-            mimeType: att.type
-          }
-        });
+        if (att && att.data && att.type) {
+          currentParts.push({
+            inlineData: {
+              data: att.data,
+              mimeType: att.type
+            }
+          });
+        }
       });
     }
     if (finalMessage && finalMessage.trim() !== "") {
       currentParts.push({ text: finalMessage });
+    }
+
+    // Satisfy Gemini API validation structure (parts array must not be empty)
+    if (currentParts.length === 0) {
+      currentParts.push({ text: " " });
     }
 
     contents.push({
@@ -224,7 +259,8 @@ app.post("/api/bububai/chat", async (req, res) => {
       }
     });
 
-    res.json({ text: response.text });
+    const textOut = response.text || "⚡ BUBUBAI servers are a little busy right now. Please try again in a moment!\n\n**bububai**";
+    res.json({ text: textOut });
   } catch (error) {
     console.error("Gemini API Error:", error);
     res.json({ text: "⚡ BUBUBAI servers are a little busy right now. Please try again in a moment!\n\n**bububai**" });
@@ -273,8 +309,7 @@ if (!process.env.VERCEL) {
     });
   });
 } else {
-  // On Vercel serverless context in production, make sure middleware/routes are defined properly
-  setupVite();
+  // On Vercel we don't setupVite or run listeners to prevent Cannot find module 'vite' or gateway timeouts.
 }
 
 export default app;
