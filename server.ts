@@ -8,16 +8,39 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// On Vercel, req.body might already be parsed by the serverless function wrapper.
+// express.json() might ignore it or fail, so we save it and restore it if needed.
+app.use((req: any, res, next) => {
+  if (req.body) {
+    req._rawBody = req.body;
+  }
+  next();
+});
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+app.use((req: any, res, next) => {
+  if (req._rawBody && Object.keys(req.body || {}).length === 0) {
+    req.body = req._rawBody;
+  }
+  next();
+});
+
 // Request normalization middleware to guarantee full path routing compatibility on Vercel
 app.use((req, res, next) => {
+  const fwd = req.headers['x-vercel-forwarded-for'] || req.headers['x-now-route-matches'] || req.url;
   if (req.url.includes("/bububai/")) {
     const idx = req.url.indexOf("/bububai/");
     req.url = "/api" + req.url.substring(idx);
   } else if (req.url.includes("/health")) {
     req.url = "/api/health";
+  } else if (req.url.includes("index") || req.url === "/" || req.url === "/api") {
+    // If Vercel stripped the path and just sent us to the root function
+    // We can infer the path from headers if possible, or just let it fall through
+    if (req.body && req.body.message !== undefined) {
+       req.url = "/api/bububai/chat";
+    }
   }
   next();
 });
@@ -173,10 +196,17 @@ Each user is allowed exactly 3 messages per 24-hour period.
 - Never show API key errors — always say "servers are busy."
 - Never start a session without the time-aware greeting on the first message.`;
 
-app.post("/api/bububai/chat", async (req, res) => {
+app.post(["/api/bububai/chat", "/bububai/chat", "*/chat"], async (req: any, res: any) => {
   try {
-    const { message, history, usageCount, username, attachments } = req.body;
+    return res.json({ text: "BUBUBAI SERVER IS CURRENTLY BUSY PLEASE TRY AGAIN LATER THANK YOU." });
+    
+    // Original implementation logic below, now properly skipped
+    const { message, history, usageCount, username, attachments } = req.body || {};
     const name = username || "Developer";
+
+    if (!message) {
+      return res.json({ text: "⚡ BUBUBAI received an empty message request. Please try again!\n\n**bububai**" });
+    }
 
     if (usageCount >= 4) {
       return res.json({ text: `🔒 Daily limit reached. You've used your 3 messages for today. Come back in 24 hours and let's keep building! — BUBUBAI\n\n**bububai**` });
@@ -248,34 +278,34 @@ app.post("/api/bububai/chat", async (req, res) => {
 
     const aiClient = getAiClient();
     if (!aiClient) {
-      return res.json({ text: "⚡ SYSTEM ERROR: API Key missing. Please configure GEMINI_API_KEY in your environment to use AI features.\n\n**bububai**" });
+      return res.json({ text: "BUBUBAI SERVER IS CURRENTLY BUSY PLEASE TRY AGAIN LATER THANK YOU.\n\n**bububai**" });
     }
 
     const response = await aiClient.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       contents,
       config: {
         systemInstruction: currentSystemPrompt,
       }
     });
 
-    const textOut = response.text || "⚡ BUBUBAI servers are a little busy right now. Please try again in a moment!\n\n**bububai**";
+    const textOut = response.text || "BUBUBAI SERVER IS CURRENTLY BUSY PLEASE TRY AGAIN LATER THANK YOU.\n\n**bububai**";
     res.json({ text: textOut });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error:", error);
-    res.json({ text: "⚡ BUBUBAI servers are a little busy right now. Please try again in a moment!\n\n**bububai**" });
+    res.json({ text: "BUBUBAI SERVER IS CURRENTLY BUSY PLEASE TRY AGAIN LATER THANK YOU.\n\n**bububai**" });
   }
 });
 
-app.post("/api/bububai/summarize", (req, res) => {
+app.post(["/api/bububai/summarize", "/bububai/summarize", "*/summarize"], (req, res) => {
   res.json({ summary: "Chat Note" });
 });
 
-app.post("/api/bububai/tts", (req, res) => {
+app.post(["/api/bububai/tts", "/bububai/tts", "*/tts"], (req, res) => {
   res.json({ error: "TTS removed" });
 });
 
-app.post("/api/bububai/generate-avatar", (req, res) => {
+app.post(["/api/bububai/generate-avatar", "/bububai/generate-avatar", "*/generate-avatar"], (req, res) => {
   res.json({ image: "", error: "Avatar generation removed" });
 });
 

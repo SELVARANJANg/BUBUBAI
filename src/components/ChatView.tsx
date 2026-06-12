@@ -133,9 +133,9 @@ export function ChatView({
 
   const [selectedMethod, setSelectedMethod] = useState<string>(() => {
     const stored = localStorage.getItem("chat_default_model");
-    if (stored === "gemini-2.1-pro") return "pro";
-    if (stored === "gemini-2.5-flash-lite") return "lite";
-    if (stored === "gemini-2.5-flash") return "ultra";
+    if (stored === "gemini-1.5-pro") return "pro";
+    if (stored === "gemini-2.0-flash-lite") return "lite";
+    if (stored === "gemini-2.0-flash") return "ultra";
     return "ultra";
   });
   const [activeDiffs, setActiveDiffs] = useState<Record<string, boolean>>({});

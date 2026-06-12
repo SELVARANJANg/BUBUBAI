@@ -28,6 +28,7 @@ import {
   LayoutGrid,
   ToggleRight,
   ArrowLeft,
+  Edit2,
 } from "lucide-react";
 import { ChatView, ChatAttachment } from "./ChatView";
 import { db, runWithRetry } from "../firebase";
@@ -249,7 +250,7 @@ export function Dashboard({
     parseFloat(localStorage.getItem("chat_temp") || "0.7"),
   );
   const [defaultModel, setDefaultModel] = useState(
-    () => localStorage.getItem("chat_default_model") || "gemini-2.5-flash",
+    () => localStorage.getItem("chat_default_model") || "gemini-1.5-pro",
   );
   const [biometricBypass, setBiometricBypass] = useState(
     () => localStorage.getItem("chat_biometric_bypass") === "true",
@@ -277,6 +278,8 @@ export function Dashboard({
   const [profileErrorMsg, setProfileErrorMsg] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [renameChatId, setRenameChatId] = useState<string | null>(null);
+  const [renameChatTitle, setRenameChatTitle] = useState<string>("");
 
   // Synchronize edit states when profile opens or userProfile updates
   useEffect(() => {
@@ -842,66 +845,144 @@ export function Dashboard({
                         key={ch.id}
                         className="flex items-center justify-between group rounded-lg hover:bg-neutral-100/50 transition-all"
                       >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveChatId(ch.id);
-                            setActiveChatPrompt(null);
-                            setDrawerOpen(false);
-                          }}
-                          className="flex-1 text-left px-2 py-1.5 text-xs text-neutral-600 hover:text-neutral-900 font-sans truncate cursor-pointer uppercase tracking-wide flex items-center gap-1.5"
-                          style={{ background: "none", border: "none" }}
-                        >
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-300 group-hover:bg-emerald-500 shrink-0"></span>
-                          <span className="truncate">{ch.title}</span>
-                        </button>
-                        {confirmDeleteId === ch.id ? (
-                          <div className="flex gap-2 relative z-10 px-1 items-center">
-                            <span className="text-[10px] text-red-500 uppercase tracking-widest font-mono font-medium">Delete?</span>
-                            <button
-                              type="button"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                try {
-                                  await runWithRetry(() =>
-                                    deleteDoc(doc(db, "chats", ch.id)),
-                                  );
-                                  setConfirmDeleteId(null);
-                                  loadChatHistory();
-                                } catch (err) {
-                                  console.error("Failed to manual delete:", err);
-                                  setConfirmDeleteId(null);
+                        {renameChatId === ch.id ? (
+                          <div className="flex-1 flex gap-1.5 items-center px-1.5 py-1">
+                            <input
+                              type="text"
+                              value={renameChatTitle}
+                              onChange={(e) => setRenameChatTitle(e.target.value)}
+                              autoFocus
+                              onKeyDown={async (e) => {
+                                if (e.key === "Enter" && renameChatTitle.trim()) {
+                                  try {
+                                    await runWithRetry(() =>
+                                      updateDoc(doc(db, "chats", ch.id), { title: renameChatTitle.trim() })
+                                    );
+                                    setRenameChatId(null);
+                                    loadChatHistory();
+                                  } catch (err) {
+                                    console.error("Failed to rename:", err);
+                                    setRenameChatId(null);
+                                  }
+                                } else if (e.key === "Escape") {
+                                  setRenameChatId(null);
                                 }
                               }}
-                              className="text-[10px] text-red-650 hover:text-red-700 uppercase tracking-wider font-mono font-bold"
-                            >
-                              Yes
-                            </button>
-                            <span className="text-neutral-300 text-[10px]">/</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConfirmDeleteId(null);
-                              }}
-                              className="text-[10px] text-neutral-400 hover:text-neutral-600 uppercase tracking-wider font-mono"
-                            >
-                              No
-                            </button>
+                              className="flex-1 text-xs text-neutral-900 bg-white border border-neutral-300 rounded px-1.5 py-1 focus:outline-none focus:border-neutral-500 font-sans"
+                            />
+                            <div className="flex items-center">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (renameChatTitle.trim()) {
+                                    try {
+                                      await runWithRetry(() =>
+                                        updateDoc(doc(db, "chats", ch.id), { title: renameChatTitle.trim() })
+                                      );
+                                      setRenameChatId(null);
+                                      loadChatHistory();
+                                    } catch (err) {
+                                      console.error("Failed to rename:", err);
+                                      setRenameChatId(null);
+                                    }
+                                  } else {
+                                    setRenameChatId(null);
+                                  }
+                                }}
+                                className="text-neutral-400 hover:text-emerald-500 p-0.5 transition-colors"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRenameChatId(null)}
+                                className="text-neutral-400 hover:text-red-500 p-0.5 transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfirmDeleteId(ch.id);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity cursor-pointer text-neutral-400"
-                            title="Delete session"
-                            style={{ background: "none", border: "none" }}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveChatId(ch.id);
+                                setActiveChatPrompt(null);
+                                setDrawerOpen(false);
+                              }}
+                              className="flex-1 text-left px-2 py-1.5 text-xs text-neutral-600 hover:text-neutral-900 font-sans truncate cursor-pointer uppercase tracking-wide flex items-center gap-1.5"
+                              style={{ background: "none", border: "none" }}
+                            >
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-300 group-hover:bg-emerald-500 shrink-0"></span>
+                              <span className="truncate">{ch.title}</span>
+                            </button>
+                            {confirmDeleteId === ch.id ? (
+                              <div className="flex gap-2 relative z-10 px-1 items-center">
+                                <span className="text-[10px] text-red-500 uppercase tracking-widest font-mono font-medium">Delete?</span>
+                                <button
+                                  type="button"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      await runWithRetry(() =>
+                                        deleteDoc(doc(db, "chats", ch.id)),
+                                      );
+                                      setConfirmDeleteId(null);
+                                      loadChatHistory();
+                                    } catch (err) {
+                                      console.error("Failed to manual delete:", err);
+                                      setConfirmDeleteId(null);
+                                    }
+                                  }}
+                                  className="text-[10px] text-red-650 hover:text-red-700 uppercase tracking-wider font-mono font-bold"
+                                >
+                                  Yes
+                                </button>
+                                <span className="text-neutral-300 text-[10px]">/</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmDeleteId(null);
+                                  }}
+                                  className="text-[10px] text-neutral-400 hover:text-neutral-600 uppercase tracking-wider font-mono"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="opacity-0 group-hover:opacity-100 flex items-center transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRenameChatId(ch.id);
+                                    setRenameChatTitle(ch.title);
+                                    setConfirmDeleteId(null);
+                                  }}
+                                  className="p-1 hover:text-neutral-700 text-neutral-400 cursor-pointer"
+                                  title="Rename session"
+                                  style={{ background: "none", border: "none" }}
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmDeleteId(ch.id);
+                                    setRenameChatId(null);
+                                  }}
+                                  className="p-1 hover:text-red-500 text-neutral-400 cursor-pointer"
+                                  title="Delete session"
+                                  style={{ background: "none", border: "none" }}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     ))}
