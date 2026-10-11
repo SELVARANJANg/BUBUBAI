@@ -45,33 +45,27 @@ app.use((req, res, next) => {
   next();
 });
 
-// API route
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+import { defaultProviderManager } from "./src/server/providers/providerManager";
+import { rateLimitMiddleware, validateChatPayload } from "./src/server/middleware/security";
+
+// API routes for health and provider status
+app.get(["/api/health", "/health"], (req, res) => {
+  const health = defaultProviderManager.getHealthStatus();
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    providers: health,
+  });
 });
 
-import { GoogleGenAI } from "@google/genai";
-
-let ai: GoogleGenAI | null = null;
-
-function getAiClient() {
-  if (!ai) {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key) {
-      console.warn("GEMINI_API_KEY is not set. AI features will fail.");
-      return null;
-    }
-    ai = new GoogleGenAI({ 
-      apiKey: key,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
-  }
-  return ai;
-}
+app.get(["/api/providers/status", "/providers/status"], (req, res) => {
+  const health = defaultProviderManager.getHealthStatus();
+  const priority = defaultProviderManager.getPriorityOrder();
+  res.json({
+    priority,
+    providers: health,
+  });
+});
 
 // System prompt for BUBUBAI
 const SYSTEM_PROMPT = `You are BUBUBAI — an elite AI coding assistant and intelligent companion built exclusively for the BUBUBAI platform (bububai.vercel.app), a product under the GAMURA ecosystem.
@@ -196,106 +190,101 @@ Each user is allowed exactly 3 messages per 24-hour period.
 - Never show API key errors — always say "servers are busy."
 - Never start a session without the time-aware greeting on the first message.`;
 
-app.post(["/api/bububai/chat", "/bububai/chat", "*/chat"], async (req: any, res: any) => {
-  try {
-    return res.json({ text: "BUBUBAI SERVER IS CURRENTLY BUSY PLEASE TRY AGAIN LATER THANK YOU." });
-    
-    // Original implementation logic below, now properly skipped
-    const { message, history, usageCount, username, attachments } = req.body || {};
-    const name = username || "Developer";
+app.post(
+  ["/api/bububai/chat", "/bububai/chat", "*/chat"],
+  rateLimitMiddleware(),
+  validateChatPayload,
+  async (req: any, res: any) => {
+    try {
+      const { message, history, usageCount, username, attachments, stream } = req.body || {};
+      const name = username || "Developer";
 
-    if (!message) {
-      return res.json({ text: "⚡ BUBUBAI received an empty message request. Please try again!\n\n**bububai**" });
-    }
-
-    if (usageCount >= 4) {
-      return res.json({ text: `🔒 Daily limit reached. You've used your 3 messages for today. Come back in 24 hours and let's keep building! — BUBUBAI\n\n**bububai**` });
-    }
-    
-    let contents = [];
-    if (history && Array.isArray(history) && history.length > 0) {
-      contents = history.map((msg: any) => {
-        const p: any[] = [];
-        if (msg.attachments && Array.isArray(msg.attachments)) {
-          msg.attachments.forEach((att: any) => {
-            if (att && att.data && att.type) {
-              p.push({
-                inlineData: {
-                  data: att.data,
-                  mimeType: att.type
-                }
-              });
-            }
-          });
-        }
-        if (msg.content && msg.content.trim() !== "") {
-          p.push({ text: msg.content });
-        }
-        // Satisfy Gemini API validation structure (parts array must not be empty)
-        if (p.length === 0) {
-          p.push({ text: " " });
-        }
-        return {
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: p,
-        };
-      });
-    }
-    
-    let finalMessage = message;
-    if (usageCount === 3) {
-      finalMessage = message + `\n\n[SYSTEM CRITICAL OBLIGATION: This is the user's 3rd and final message for today. You MUST respond fully to their request, and then you MUST directly append EXACTLY this note at the end of your message (before your **bububai** signature): "⚠️ You've used all 3 of your daily messages. Your limit resets in 24 hours. See you tomorrow, ${name}! 🚀"]`;
-    }
-
-    const currentParts: any[] = [];
-    if (attachments && Array.isArray(attachments)) {
-      attachments.forEach((att: any) => {
-        if (att && att.data && att.type) {
-          currentParts.push({
-            inlineData: {
-              data: att.data,
-              mimeType: att.type
-            }
-          });
-        }
-      });
-    }
-    if (finalMessage && finalMessage.trim() !== "") {
-      currentParts.push({ text: finalMessage });
-    }
-
-    // Satisfy Gemini API validation structure (parts array must not be empty)
-    if (currentParts.length === 0) {
-      currentParts.push({ text: " " });
-    }
-
-    contents.push({
-      role: 'user',
-      parts: currentParts,
-    });
-
-    const currentSystemPrompt = SYSTEM_PROMPT.replace(/\[Username\]/g, name);
-
-    const aiClient = getAiClient();
-    if (!aiClient) {
-      return res.json({ text: "BUBUBAI SERVER IS CURRENTLY BUSY PLEASE TRY AGAIN LATER THANK YOU.\n\n**bububai**" });
-    }
-
-    const response = await aiClient.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents,
-      config: {
-        systemInstruction: currentSystemPrompt,
+      if (usageCount >= 4) {
+        return res.json({
+          text: `🔒 Daily limit reached. You've used your 3 messages for today. Come back in 24 hours and let's keep building! — BUBUBAI\n\n**bububai**`,
+          provider: 'system',
+        });
       }
-    });
 
-    const textOut = response.text || "BUBUBAI SERVER IS CURRENTLY BUSY PLEASE TRY AGAIN LATER THANK YOU.\n\n**bububai**";
-    res.json({ text: textOut });
-  } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    res.json({ text: "BUBUBAI SERVER IS CURRENTLY BUSY PLEASE TRY AGAIN LATER THANK YOU.\n\n**bububai**" });
+      let finalMessage = message;
+      if (usageCount === 3) {
+        finalMessage = message + `\n\n[SYSTEM CRITICAL OBLIGATION: This is the user's 3rd and final message for today. You MUST respond fully to their request, and then you MUST directly append EXACTLY this note at the end of your message (before your **bububai** signature): "⚠️ You've used all 3 of your daily messages. Your limit resets in 24 hours. See you tomorrow, ${name}! 🚀"]`;
+      }
+
+      const currentSystemPrompt = SYSTEM_PROMPT.replace(/\[Username\]/g, name);
+
+      // Support streaming if requested
+      const isStreaming = stream === true || req.headers['accept'] === 'text/event-stream';
+      if (isStreaming) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        try {
+          const streamResult = await defaultProviderManager.generateStream(
+            {
+              message: finalMessage,
+              history: history || [],
+              systemPrompt: currentSystemPrompt,
+              username: name,
+              attachments: attachments || [],
+            },
+            (chunk: string) => {
+              res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+            }
+          );
+
+          res.write(
+            `data: ${JSON.stringify({
+              done: true,
+              provider: streamResult.provider,
+              model: streamResult.model,
+            })}\n\n`
+          );
+          return res.end();
+        } catch (streamErr: any) {
+          console.error("Streaming fallback exhausted:", streamErr?.message || streamErr);
+          res.write(
+            `data: ${JSON.stringify({
+              error: true,
+              text: "⚡ BUBUBAI servers are a little busy right now. Please try again in a moment!\n\n**bububai**",
+            })}\n\n`
+          );
+          return res.end();
+        }
+      }
+
+      // Standard JSON request
+      const result = await defaultProviderManager.generateContent({
+        message: finalMessage,
+        history: history || [],
+        systemPrompt: currentSystemPrompt,
+        username: name,
+        attachments: attachments || [],
+      });
+
+      let textOut = (result.text || "").trim();
+      if (!textOut.includes("**bububai**")) {
+        textOut = `${textOut}\n\n**bububai**`;
+      }
+
+      return res.json({
+        text: textOut,
+        provider: result.provider,
+        model: result.model,
+        fallbackCount: result.fallbackCount,
+      });
+    } catch (error: any) {
+      console.error("All AI providers failed:", error?.message || error);
+      // Safe fallback: never expose technical errors or credentials
+      return res.json({
+        text: "⚡ BUBUBAI servers are a little busy right now. Please try again in a moment!\n\n**bububai**",
+        provider: "fallback",
+        error: "Server busy",
+      });
+    }
   }
-});
+);
 
 app.post(["/api/bububai/summarize", "/bububai/summarize", "*/summarize"], (req, res) => {
   res.json({ summary: "Chat Note" });

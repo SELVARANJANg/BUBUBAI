@@ -23,6 +23,7 @@ import {
   Sun,
   Moon,
   GitCompare,
+  Server,
 } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
@@ -35,6 +36,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { ModesSheet, MODES } from "./ModesSheet";
+import { ProviderStatusModal } from "./ProviderStatusModal";
 
 export interface ChatAttachment {
   type: string;
@@ -50,6 +52,7 @@ export interface ChatMessage {
   isLiked?: boolean;
   isDisliked?: boolean;
   attachments?: ChatAttachment[];
+  provider?: string;
 }
 
 /**
@@ -128,6 +131,7 @@ export function ChatView({
   
   // Modes state
   const [isModesSheetOpen, setIsModesSheetOpen] = useState(false);
+  const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [activeModeId, setActiveModeId] = useState("normal");
   const activeMode = MODES.find((m) => m.id === activeModeId) || MODES[0];
 
@@ -648,12 +652,14 @@ Please try again in a few moments. 🔄
       });
 
       let responseText = "No reply was returned.";
+      let responseProvider: string | undefined = undefined;
       if (!response.ok) {
         throw new Error(`Server returned status ${response.status}`);
       }
       try {
         const data = await response.json();
         responseText = data.text || responseText;
+        responseProvider = data.provider;
       } catch (e) {
         throw new Error("Failed to parse response. The generation may have timed out.");
       }
@@ -663,6 +669,7 @@ Please try again in a few moments. 🔄
         role: "model",
         content: responseText,
         timestamp: new Date(),
+        provider: responseProvider,
       };
 
       const finalMessages = [...updatedMessages, replyMsg];
@@ -956,6 +963,7 @@ Please try again in a few moments. 🔄
             role: "model",
             content: data.text || "No response returned.",
             timestamp: new Date(),
+            provider: data.provider,
           };
           setMessages((prev) => [...prev, replyMsg]);
         })
@@ -1028,12 +1036,14 @@ Please try again in a few moments. 🔄
       });
 
       let responseText = "No reply was returned.";
+      let responseProvider: string | undefined = undefined;
       if (!response.ok) {
         throw new Error(`Server returned status ${response.status}`);
       }
       try {
         const data = await response.json();
         responseText = data.text || responseText;
+        responseProvider = data.provider;
       } catch (e) {
         throw new Error("Failed to parse response. The generation may have timed out.");
       }
@@ -1042,6 +1052,7 @@ Please try again in a few moments. 🔄
         role: "model",
         content: responseText,
         timestamp: new Date(),
+        provider: responseProvider,
       };
 
       const finalMessages = [...updatedMessages, replyMsg];
@@ -1716,6 +1727,17 @@ Please try again in a few moments. 🔄
                   <span>Modes</span>
                 </button>
                 <div className="h-[1px] bg-[#ebebe8] w-full my-1" />
+                <button
+                  onClick={() => {
+                    setShowPopupMenu(false);
+                    setIsProviderModalOpen(true);
+                  }}
+                  className="flex items-center w-full px-4 py-2.5 text-sm font-semibold text-[#111110] hover:bg-[#f4f4f2] transition-colors gap-3 justify-start cursor-pointer"
+                >
+                  <Server className="w-4 h-4 stroke-[2.5]" />
+                  <span>AI Fallbacks</span>
+                </button>
+                <div className="h-[1px] bg-[#ebebe8] w-full my-1" />
                 <a
                   href="/tester.html"
                   target="_blank"
@@ -2232,6 +2254,11 @@ Please try again in a few moments. 🔄
         onClose={() => setIsModesSheetOpen(false)}
         activeModeId={activeModeId}
         onApplyMode={(id) => setActiveModeId(id)}
+      />
+
+      <ProviderStatusModal
+        isOpen={isProviderModalOpen}
+        onClose={() => setIsProviderModalOpen(false)}
       />
     </div>
   );
