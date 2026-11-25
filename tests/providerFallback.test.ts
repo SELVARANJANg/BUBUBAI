@@ -58,7 +58,7 @@ async function runTests() {
       name: 'Google Gemini',
       onGenerate: async () => {
         geminiCalled = true;
-        return { text: 'Gemini answer', model: 'gemini-2.5-flash' };
+        return { text: 'Gemini answer', model: 'gemini-4-hydrogen' };
       },
     });
 
@@ -398,8 +398,8 @@ async function runTests() {
       name: 'Google Gemini',
       isConfigured: () => true,
       isEnabled: () => true,
-      getModel: () => 'gemini-2.5-flash',
-      generateContent: async () => ({ text: 'gemini', model: 'gemini-2.5-flash' }),
+      getModel: () => 'gemini-4-hydrogen',
+      generateContent: async () => ({ text: 'gemini', model: 'gemini-4-hydrogen' }),
       generateStream: async () => {
         // Fails BEFORE yielding any chunks
         const err: any = new Error('HTTP 429: Rate limited before streaming started');

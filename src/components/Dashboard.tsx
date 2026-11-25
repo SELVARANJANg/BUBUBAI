@@ -29,8 +29,19 @@ import {
   ToggleRight,
   ArrowLeft,
   Edit2,
+  Cloud,
 } from "lucide-react";
 import { ChatView, ChatAttachment } from "./ChatView";
+import { BBBQRCodeCard, formatBBBIdentifier } from "./BBBQRCodeCard";
+import {
+  getPuterUser,
+  signInPuter,
+  signOutPuter,
+  syncBBBPassToPuter,
+  isPuterAIFallbackEnabled,
+  setPuterAIFallbackEnabled,
+  PuterUserInfo,
+} from "../utils/puter";
 import { db, runWithRetry } from "../firebase";
 import {
   collection,
@@ -280,6 +291,60 @@ export function Dashboard({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [renameChatId, setRenameChatId] = useState<string | null>(null);
   const [renameChatTitle, setRenameChatTitle] = useState<string>("");
+
+  // Puter Cloud & AI state
+  const [puterUser, setPuterUser] = useState<PuterUserInfo | null>(null);
+  const [puterConnecting, setPuterConnecting] = useState(false);
+  const [puterFallback, setPuterFallback] = useState<boolean>(() =>
+    isPuterAIFallbackEnabled(),
+  );
+
+  useEffect(() => {
+    getPuterUser().then((u) => setPuterUser(u));
+  }, [profileOpen, settingsOpen]);
+
+  const handleConnectPuter = async () => {
+    setPuterConnecting(true);
+    try {
+      const user = await signInPuter();
+      setPuterUser(user);
+      showToast(`Connected to Puter as @${user.username} ✓`);
+    } catch (err: any) {
+      setProfileErrorMsg(err?.message || "Could not connect to Puter.");
+    } finally {
+      setPuterConnecting(false);
+    }
+  };
+
+  const handleDisconnectPuter = async () => {
+    await signOutPuter();
+    setPuterUser(null);
+    showToast("Disconnected from Puter ✓");
+  };
+
+  const handleSyncBBBToPuter = async () => {
+    try {
+      let current = puterUser;
+      if (!current) {
+        current = await signInPuter();
+        setPuterUser(current);
+      }
+      const bbbId = formatBBBIdentifier(userProfile?.uid);
+      await syncBBBPassToPuter({
+        bbbId,
+        uid: userProfile?.uid || "",
+        username: userProfile?.username || "user",
+        name: userProfile?.name || "User",
+        syncedAt: new Date().toISOString(),
+      });
+      setProfileStatusMsg(
+        `BBB Pass (${bbbId}) backed up to Puter Cloud Drive & KV.`,
+      );
+      setTimeout(() => setProfileStatusMsg(""), 3500);
+    } catch (err: any) {
+      setProfileErrorMsg(err?.message || "Failed to sync pass to Puter.");
+    }
+  };
 
   // Synchronize edit states when profile opens or userProfile updates
   useEffect(() => {
@@ -2085,6 +2150,16 @@ export function Dashboard({
                       )}
                     </button>
                   </div>
+
+                  {/* Unique BBB Identifier QR Code for Quick Physical-to-Digital Authentication */}
+                  <BBBQRCodeCard
+                    uid={userProfile?.uid}
+                    username={userProfile?.username}
+                    name={userProfile?.name}
+                    variant="light"
+                    puterConnected={Boolean(puterUser)}
+                    onSyncToPuter={handleSyncBBBToPuter}
+                  />
                 </div>
 
                 <div className="flex gap-2 justify-end pt-3 border-t border-[#f4f4f2] mt-4 font-sans">
@@ -2607,44 +2682,114 @@ export function Dashboard({
               )}
 
               {settingsView === "apps" && (
-                <div className="bg-neutral-50 rounded-[24px] overflow-hidden border border-neutral-100 py-1">
-                  {[
-                    { id: "core", name: "BUBUBAI Core" },
-                    { id: "gamura", name: "Gamura" },
-                    { id: "galaxy", name: "Gamura Galaxy" },
-                  ].map((app) => (
-                    <div
-                      key={app.id}
-                      className="w-full flex items-center justify-between p-4 border-b border-neutral-50 last:border-0 bg-white"
-                    >
-                      <span className="text-[15px] font-medium text-neutral-800">
-                        {app.name}
-                      </span>
-                      <label className="relative inline-flex items-center cursor-pointer">
+                <div className="space-y-4">
+                  {/* Puter Cloud & AI Integration */}
+                  <div className="bg-white rounded-[24px] overflow-hidden border border-neutral-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                          <Cloud className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-[14px] font-semibold text-neutral-900 leading-tight">
+                            Puter Cloud &amp; AI
+                          </div>
+                          <div className="text-[11px] text-neutral-500 mt-0.5">
+                            {puterUser
+                              ? `Connected as @${puterUser.username}`
+                              : "Free cloud storage, KV sync & AI fallback"}
+                          </div>
+                        </div>
+                      </div>
+                      {puterUser ? (
+                        <button
+                          type="button"
+                          onClick={handleDisconnectPuter}
+                          className="px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-semibold transition cursor-pointer"
+                        >
+                          Disconnect
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleConnectPuter}
+                          disabled={puterConnecting}
+                          className="px-3.5 py-1.5 rounded-xl bg-[#111110] hover:bg-neutral-800 text-white text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                        >
+                          {puterConnecting ? "Connecting..." : "Connect"}
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-neutral-100 flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-medium text-neutral-800">
+                          Puter AI Cloud Fallback
+                        </div>
+                        <div className="text-[11px] text-neutral-500">
+                          Route via Puter AI when server providers are busy
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
                         <input
                           type="checkbox"
-                          checked={settingsApps[app.id]}
+                          checked={puterFallback}
                           onChange={(e) => {
-                            const updated = {
-                              ...settingsApps,
-                              [app.id]: e.target.checked,
-                            };
-                            setSettingsApps(updated);
-                            localStorage.setItem(
-                              "bububai_apps",
-                              JSON.stringify(updated),
+                            const val = e.target.checked;
+                            setPuterFallback(val);
+                            setPuterAIFallbackEnabled(val);
+                            showToast(
+                              val
+                                ? "Puter AI fallback enabled ✓"
+                                : "Puter AI fallback disabled ✓",
                             );
-                            showToast("Apps updated ✓");
                           }}
                           className="sr-only peer"
                         />
                         <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0ea872]"></div>
                       </label>
                     </div>
-                  ))}
-                  <div className="p-4 bg-neutral-50 text-xs text-neutral-500 leading-relaxed">
-                    BUBUBAI can access information from connected apps, based on
-                    what you're authorized to view.
+                  </div>
+
+                  <div className="bg-neutral-50 rounded-[24px] overflow-hidden border border-neutral-100 py-1">
+                    {[
+                      { id: "core", name: "BUBUBAI Core" },
+                      { id: "gamura", name: "Gamura" },
+                      { id: "galaxy", name: "Gamura Galaxy" },
+                    ].map((app) => (
+                      <div
+                        key={app.id}
+                        className="w-full flex items-center justify-between p-4 border-b border-neutral-50 last:border-0 bg-white"
+                      >
+                        <span className="text-[15px] font-medium text-neutral-800">
+                          {app.name}
+                        </span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={settingsApps[app.id]}
+                            onChange={(e) => {
+                              const updated = {
+                                ...settingsApps,
+                                [app.id]: e.target.checked,
+                              };
+                              setSettingsApps(updated);
+                              localStorage.setItem(
+                                "bububai_apps",
+                                JSON.stringify(updated),
+                              );
+                              showToast("Apps updated ✓");
+                            }}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#0ea872]"></div>
+                        </label>
+                      </div>
+                    ))}
+                    <div className="p-4 bg-neutral-50 text-xs text-neutral-500 leading-relaxed">
+                      BUBUBAI can access information from connected apps, based on
+                      what you're authorized to view.
+                    </div>
                   </div>
                 </div>
               )}

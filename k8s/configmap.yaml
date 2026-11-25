@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bububai-config
+  labels:
+    app: bububai
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  PROVIDER_PRIORITY: "gemini,nvidia,openai"
+  LB_STRATEGY: "priority"
+  GEMINI_MODEL: "gemini-4-hydrogen"
+  NVIDIA_MODEL: "meta/llama-3.3-70b-instruct"
+  OPENAI_MODEL: "gpt-4o-mini"
+  OPENAI_ENABLED: "false"
+  PROVIDER_TIMEOUT_MS: "15000"
+  CACHE_ENABLED: "true"
+  CACHE_MAX_ENTRIES: "250"
+  CACHE_TTL_MS: "300000"
+  RATE_LIMIT_MAX_REQUESTS: "30"
+  RATE_LIMIT_WINDOW_MS: "60000"
+  CIRCUIT_FAILURE_THRESHOLD: "3"
+  CIRCUIT_RESET_TIMEOUT_MS: "60000"

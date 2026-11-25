@@ -1,3 +1,5 @@
+import { CircuitState } from '../resilience/circuitBreaker';
+
 export type ProviderId = 'gemini' | 'nvidia' | 'openai';
 
 export interface ChatMessageItem {
@@ -37,6 +39,7 @@ export interface AIResponse {
   model: string;
   fallbackCount: number;
   fallbackChain: FallbackRecord[];
+  cached?: boolean;
 }
 
 export interface ProviderHealth {
@@ -46,6 +49,9 @@ export interface ProviderHealth {
   enabled: boolean;
   model: string;
   status: 'healthy' | 'rate_limited' | 'error' | 'unconfigured' | 'disabled';
+  circuitState?: CircuitState;
+  avgLatencyMs?: number;
+  requests?: number;
   lastUsed?: string;
   lastError?: string;
   cooldownUntil?: number;

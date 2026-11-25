@@ -49,7 +49,7 @@ BUBUBAI is architected with a resilient server-side provider orchestrator (`src/
 
 | Provider | Environment Variable | Default Model | Supported Alternate Models |
 | :--- | :--- | :--- | :--- |
-| **Google Gemini** | `GEMINI_API_KEY` | `gemini-2.5-flash` | `gemini-3.8-flash`, `gemini-flash-latest` |
+| **Google Gemini** | `GEMINI_API_KEY` | `gemini-4-hydrogen` | `gemini-3.8-flash`, `gemini-3.1-flash-lite` |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | `meta/llama-3.3-70b-instruct` | `nvidia/llama-3.1-nemotron-70b-instruct`, `mistralai/mistral-large-2-instruct`, `deepseek-ai/deepseek-r1` |
 | **OpenAI** (Optional) | `OPENAI_API_KEY` | `gpt-4o-mini` | `gpt-4o`, `o3-mini` |
 
@@ -60,7 +60,7 @@ BUBUBAI is architected with a resilient server-side provider orchestrator (`src/
 | Variable | Required | Default | Description |
 | :--- | :---: | :---: | :--- |
 | `GEMINI_API_KEY` | Yes | - | API Key from Google AI Studio. |
-| `GEMINI_MODEL` | No | `gemini-2.5-flash` | Selected Gemini model. |
+| `GEMINI_MODEL` | No | `gemini-4-hydrogen` | Selected Gemini model. |
 | `NVIDIA_API_KEY` | Yes | - | API Key from NVIDIA build.nvidia.com. |
 | `NVIDIA_MODEL` | No | `meta/llama-3.3-70b-instruct` | NVIDIA NIM model. |
 | `OPENAI_API_KEY` | No | - | API Key from platform.openai.com. |

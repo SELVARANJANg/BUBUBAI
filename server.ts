@@ -6,7 +6,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || "3000", 10);
+
+// Trust Reverse Proxy / NGINX / Kubernetes Ingress / Vercel Edge headers
+app.set("trust proxy", 1);
 
 // On Vercel, req.body might already be parsed by the serverless function wrapper.
 // express.json() might ignore it or fail, so we save it and restore it if needed.
@@ -46,9 +49,21 @@ app.use((req, res, next) => {
 });
 
 import { defaultProviderManager } from "./src/server/providers/providerManager";
-import { rateLimitMiddleware, validateChatPayload } from "./src/server/middleware/security";
+import {
+  rateLimitMiddleware,
+  validateChatPayload,
+  defaultRateLimiter,
+} from "./src/server/middleware/security";
+import { defaultResponseCache } from "./src/server/cache/responseCache";
+import {
+  apiGatewayMiddleware,
+  defaultGatewayState,
+} from "./src/server/gateway/apiGateway";
 
-// API routes for health and provider status
+// Centralized API Gateway middleware for all API routes
+app.use(["/api", "/bububai", "/health", "/providers"], apiGatewayMiddleware);
+
+// Health, Liveness & Readiness Probes (Kubernetes / Load Balancer / Docker)
 app.get(["/api/health", "/health"], (req, res) => {
   const health = defaultProviderManager.getHealthStatus();
   res.json({
@@ -58,12 +73,112 @@ app.get(["/api/health", "/health"], (req, res) => {
   });
 });
 
+app.get(["/api/health/live", "/health/live"], (req, res) => {
+  res.status(200).json({
+    status: "alive",
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get(["/api/health/ready", "/health/ready"], (req, res) => {
+  const providers = defaultProviderManager.getHealthStatus();
+  const anyReady = providers.some(
+    (p) => p.configured && p.enabled && p.circuitState !== "OPEN"
+  );
+  res.status(anyReady ? 200 : 503).json({
+    status: anyReady ? "ready" : "degraded",
+    readyProviders: providers
+      .filter((p) => p.configured && p.enabled && p.circuitState !== "OPEN")
+      .map((p) => p.id),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get(["/api/providers/status", "/providers/status"], (req, res) => {
   const health = defaultProviderManager.getHealthStatus();
   const priority = defaultProviderManager.getPriorityOrder();
   res.json({
     priority,
+    strategy: defaultProviderManager.getLoadBalancer().getStrategy(),
     providers: health,
+  });
+});
+
+// Service Discovery endpoint
+app.get(["/api/discovery/services", "/discovery/services"], (req, res) => {
+  const registry = defaultProviderManager.getServiceRegistry();
+  res.json(registry.getSummary());
+});
+
+// Unified 10-Pillar Architecture & Infrastructure Status endpoint (safe, zero secrets)
+app.get(["/api/infra/status", "/infra/status"], (req, res) => {
+  const providers = defaultProviderManager.getHealthStatus();
+  const gateway = defaultGatewayState.getMetrics();
+  const rateLimit = defaultRateLimiter.getStats();
+  const cache = defaultResponseCache.getStats();
+  const loadBalancer = defaultProviderManager.getLoadBalancer().getStats();
+  const circuitBreakers = defaultProviderManager.getCircuitBreaker().getAllStates();
+  const discovery = defaultProviderManager.getServiceRegistry().getSummary();
+
+  res.json({
+    timestamp: new Date().toISOString(),
+    pillars: {
+      rateLimiting: {
+        status: "active",
+        algorithm: "token-bucket + sliding-window",
+        ...rateLimit,
+      },
+      caching: {
+        status: cache.enabled ? "active" : "disabled",
+        algorithm: "LRU + TTL (SHA-256)",
+        ...cache,
+      },
+      loadBalancing: {
+        status: "active",
+        ...loadBalancer,
+      },
+      reverseProxy: {
+        status: gateway.proxyDetected ? "proxy-detected" : "ready",
+        trustProxy: true,
+        nginxConfig: "infra/nginx/nginx.conf",
+      },
+      apiGateway: {
+        status: "active",
+        ...gateway,
+      },
+      cicd: {
+        status: "configured",
+        pipeline: ".github/workflows/ci-cd.yml",
+      },
+      docker: {
+        status: "configured",
+        dockerfile: "Dockerfile",
+        compose: "docker-compose.yml",
+      },
+      kubernetes: {
+        status: "configured",
+        manifests: "k8s/deployment.yaml, service.yaml, hpa.yaml, ingress.yaml",
+        probes: ["/api/health/live", "/api/health/ready"],
+      },
+      serviceDiscovery: {
+        status: "active",
+        totalServices: discovery.totalServices,
+        up: discovery.up,
+        degraded: discovery.degraded,
+        down: discovery.down,
+      },
+      circuitBreaker: {
+        status: "active",
+        states: circuitBreakers,
+        providers: providers.map((p) => ({
+          id: p.id,
+          name: p.name,
+          circuitState: p.circuitState || "CLOSED",
+          status: p.status,
+        })),
+      },
+    },
   });
 });
 
@@ -254,6 +369,36 @@ app.post(
         }
       }
 
+      // Check LRU Response Cache for cacheable non-streaming requests
+      const isCacheable =
+        defaultResponseCache.isEnabled() &&
+        (!attachments || attachments.length === 0) &&
+        (usageCount === undefined || usageCount < 3);
+
+      const cacheKey = isCacheable
+        ? defaultResponseCache.buildKey({
+            message: message.trim(),
+            history: (history || []).slice(-6),
+            name,
+          })
+        : null;
+
+      if (cacheKey) {
+        const cached = defaultResponseCache.get(cacheKey);
+        if (cached) {
+          res.setHeader("X-Cache", "HIT");
+          return res.json({
+            text: cached.text,
+            provider: cached.provider,
+            model: cached.model,
+            cached: true,
+            fallbackCount: 0,
+          });
+        }
+      }
+
+      res.setHeader("X-Cache", "MISS");
+
       // Standard JSON request
       const result = await defaultProviderManager.generateContent({
         message: finalMessage,
@@ -268,10 +413,19 @@ app.post(
         textOut = `${textOut}\n\n**bububai**`;
       }
 
+      if (cacheKey && textOut) {
+        defaultResponseCache.set(cacheKey, {
+          text: textOut,
+          provider: result.provider,
+          model: result.model,
+        });
+      }
+
       return res.json({
         text: textOut,
         provider: result.provider,
         model: result.model,
+        cached: false,
         fallbackCount: result.fallbackCount,
       });
     } catch (error: any) {

@@ -1,71 +1,181 @@
 import { Request, Response, NextFunction } from 'express';
 
-interface RateLimitRecord {
-  count: number;
-  resetAt: number;
+interface TokenBucketRecord {
+  tokens: number;
+  lastRefill: number;
+  windowStart: number;
+  windowCount: number;
 }
 
-// In-memory sliding rate limit store
-const ipStore = new Map<string, RateLimitRecord>();
+export interface RateLimiterStats {
+  activeBuckets: number;
+  totalAllowed: number;
+  totalBlocked: number;
+  maxRequestsPerWindow: number;
+  windowMs: number;
+}
 
-// Clean up stale rate limit entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of ipStore.entries()) {
-    if (now > value.resetAt) {
-      ipStore.delete(key);
+export class RateLimiter {
+  private buckets = new Map<string, TokenBucketRecord>();
+  private totalAllowed = 0;
+  private totalBlocked = 0;
+  private readonly maxRequests: number;
+  private readonly windowMs: number;
+
+  constructor(options?: { maxRequests?: number; windowMs?: number }) {
+    this.maxRequests =
+      options?.maxRequests ??
+      parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '30', 10);
+    this.windowMs =
+      options?.windowMs ??
+      parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);
+  }
+
+  public consume(key: string): {
+    allowed: boolean;
+    limit: number;
+    remaining: number;
+    resetAtSec: number;
+    retryAfterSec: number;
+  } {
+    const now = Date.now();
+    let record = this.buckets.get(key);
+
+    if (!record || now - record.windowStart >= this.windowMs) {
+      record = {
+        tokens: this.maxRequests - 1,
+        lastRefill: now,
+        windowStart: now,
+        windowCount: 1,
+      };
+      this.buckets.set(key, record);
+      this.totalAllowed++;
+      return {
+        allowed: true,
+        limit: this.maxRequests,
+        remaining: record.tokens,
+        resetAtSec: Math.ceil((now + this.windowMs) / 1000),
+        retryAfterSec: 0,
+      };
+    }
+
+    // Refill proportional tokens smoothly within window (token bucket + sliding window cap)
+    const elapsed = now - record.lastRefill;
+    const refillRatePerMs = this.maxRequests / this.windowMs;
+    const refilled = Math.floor(elapsed * refillRatePerMs);
+    if (refilled > 0) {
+      record.tokens = Math.min(this.maxRequests, record.tokens + refilled);
+      record.lastRefill = now;
+    }
+
+    if (record.windowCount >= this.maxRequests || record.tokens <= 0) {
+      this.totalBlocked++;
+      const retryAfterSec = Math.max(
+        1,
+        Math.ceil((record.windowStart + this.windowMs - now) / 1000)
+      );
+      return {
+        allowed: false,
+        limit: this.maxRequests,
+        remaining: 0,
+        resetAtSec: Math.ceil((record.windowStart + this.windowMs) / 1000),
+        retryAfterSec,
+      };
+    }
+
+    record.tokens -= 1;
+    record.windowCount += 1;
+    this.totalAllowed++;
+
+    return {
+      allowed: true,
+      limit: this.maxRequests,
+      remaining: Math.max(0, Math.min(record.tokens, this.maxRequests - record.windowCount)),
+      resetAtSec: Math.ceil((record.windowStart + this.windowMs) / 1000),
+      retryAfterSec: 0,
+    };
+  }
+
+  public prune(): void {
+    const now = Date.now();
+    for (const [key, val] of this.buckets.entries()) {
+      if (now - val.windowStart > this.windowMs * 2) {
+        this.buckets.delete(key);
+      }
     }
   }
+
+  public getStats(): RateLimiterStats {
+    this.prune();
+    return {
+      activeBuckets: this.buckets.size,
+      totalAllowed: this.totalAllowed,
+      totalBlocked: this.totalBlocked,
+      maxRequestsPerWindow: this.maxRequests,
+      windowMs: this.windowMs,
+    };
+  }
+}
+
+export const defaultRateLimiter = new RateLimiter();
+
+// Periodic cleanup in non-serverless environments
+const cleanupTimer = setInterval(() => {
+  defaultRateLimiter.prune();
 }, 60000);
+if (typeof cleanupTimer.unref === 'function') {
+  cleanupTimer.unref();
+}
 
 export function getClientIp(req: Request): string {
   const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') {
+  if (typeof forwarded === 'string' && forwarded.trim()) {
     return forwarded.split(',')[0].trim();
   }
-  return req.socket?.remoteAddress || '127.0.0.1';
+  const realIp = req.headers['x-real-ip'];
+  if (typeof realIp === 'string' && realIp.trim()) {
+    return realIp.trim();
+  }
+  return req.ip || req.socket?.remoteAddress || '127.0.0.1';
 }
 
 /**
- * Server-side rate limiter to prevent abuse and quota exhaustion.
+ * Server-side token-bucket + sliding-window rate limiter to prevent abuse and quota exhaustion.
  */
 export function rateLimitMiddleware(options?: {
   maxRequests?: number;
   windowMs?: number;
+  limiter?: RateLimiter;
 }) {
-  const max = options?.maxRequests ?? parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '30', 10);
-  const windowMs = options?.windowMs ?? parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);
+  const limiter =
+    options?.limiter ||
+    (options?.maxRequests || options?.windowMs
+      ? new RateLimiter(options)
+      : defaultRateLimiter);
 
   return (req: Request, res: Response, next: NextFunction) => {
     const ip = getClientIp(req);
-    const now = Date.now();
+    const username =
+      typeof req.body?.username === 'string' && req.body.username.trim()
+        ? req.body.username.trim().slice(0, 64)
+        : 'anon';
+    const key = `${ip}:${username}`;
 
-    const record = ipStore.get(ip);
-    if (!record || now > record.resetAt) {
-      ipStore.set(ip, {
-        count: 1,
-        resetAt: now + windowMs,
-      });
-      res.setHeader('X-RateLimit-Limit', max);
-      res.setHeader('X-RateLimit-Remaining', max - 1);
-      return next();
-    }
+    const result = limiter.consume(key);
 
-    if (record.count >= max) {
-      const retryAfterSec = Math.ceil((record.resetAt - now) / 1000);
-      res.setHeader('Retry-After', retryAfterSec);
-      res.setHeader('X-RateLimit-Limit', max);
-      res.setHeader('X-RateLimit-Remaining', 0);
+    res.setHeader('X-RateLimit-Limit', result.limit);
+    res.setHeader('X-RateLimit-Remaining', result.remaining);
+    res.setHeader('X-RateLimit-Reset', result.resetAtSec);
+
+    if (!result.allowed) {
+      res.setHeader('Retry-After', result.retryAfterSec);
       return res.status(429).json({
         error: 'Too many requests. Please slow down.',
         text: '⚡ You have sent too many requests in a short period. Please wait a moment before trying again.\n\n**bububai**',
-        retryAfter: retryAfterSec,
+        retryAfter: result.retryAfterSec,
       });
     }
 
-    record.count++;
-    res.setHeader('X-RateLimit-Limit', max);
-    res.setHeader('X-RateLimit-Remaining', Math.max(0, max - record.count));
     next();
   };
 }
@@ -99,7 +209,6 @@ export function validateChatPayload(req: Request, res: Response, next: NextFunct
   }
 
   if (Array.isArray(history) && history.length > 50) {
-    // Truncate to most recent 50 messages safely
     req.body.history = history.slice(-50);
   }
 

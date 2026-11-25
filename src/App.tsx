@@ -19,8 +19,10 @@ import {
   LogOut,
   Award,
   Calendar,
+  QrCode,
 } from "lucide-react";
 import { Dashboard } from "./components/Dashboard";
+import { BBBQRCodeCard } from "./components/BBBQRCodeCard";
 import {
   auth,
   db,
@@ -103,6 +105,7 @@ export default function App() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [copiedUid, setCopiedUid] = useState(false);
+  const [showPassQR, setShowPassQR] = useState(true);
   const [editName, setEditName] = useState("");
   const [editNickname, setEditNickname] = useState("");
 
@@ -988,8 +991,27 @@ export default function App() {
                           </div>
                         </div>
 
+                        {/* Unique BBB Identifier QR Code Card */}
+                        {showPassQR && (
+                          <BBBQRCodeCard
+                            uid={currentAuthUser.uid}
+                            username={userProfile.username}
+                            name={userProfile.name}
+                            variant="dark"
+                          />
+                        )}
+
                         {/* Actions underneath card */}
                         <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowPassQR((prev) => !prev)}
+                            className="flex-1 py-3 bg-neutral-800/80 hover:bg-neutral-800 text-emerald-400 text-xs sm:text-sm font-bold tracking-[0.12em] rounded-2xl border border-emerald-800/40 transition-all duration-200 uppercase flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                          >
+                            <QrCode className="w-4 h-4" />
+                            {showPassQR ? "Hide QR Pass" : "Show QR Pass"}
+                          </button>
+
                           {!isEditingProfile && (
                             <button
                               onClick={() => {

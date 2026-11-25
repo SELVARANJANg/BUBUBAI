@@ -24,6 +24,7 @@ import {
   Moon,
   GitCompare,
   Server,
+  Cloud,
 } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
@@ -37,6 +38,13 @@ import {
 } from "firebase/firestore";
 import { ModesSheet, MODES } from "./ModesSheet";
 import { ProviderStatusModal } from "./ProviderStatusModal";
+import {
+  isPuterSignedIn,
+  isPuterAIFallbackEnabled,
+  chatWithPuterAI,
+  backupChatToPuter,
+  signInPuter,
+} from "../utils/puter";
 
 export interface ChatAttachment {
   type: string;
@@ -556,6 +564,7 @@ export function ChatView({
       });
 
       let responseText = "Error getting reply from BUBUBAI.";
+      let responseProvider: string | undefined = undefined;
       
       if (!response.ok) {
         throw new Error(`Server returned status ${response.status}`);
@@ -564,8 +573,27 @@ export function ChatView({
       try {
         const data = await response.json();
         responseText = data.text || responseText;
+        responseProvider = data.provider;
       } catch (parseErr) {
         throw new Error("Failed to parse response. The generation may have timed out.");
+      }
+
+      if (
+        responseProvider === "fallback" &&
+        dailyUsage.count + 1 < 4 &&
+        isPuterSignedIn() &&
+        isPuterAIFallbackEnabled()
+      ) {
+        try {
+          responseText = await chatWithPuterAI({
+            message: promptText,
+            history: [],
+            username: displayName || "Developer",
+          });
+          responseProvider = "puter";
+        } catch {
+          // Keep server-busy fallback text
+        }
       }
 
       const replyMsg: ChatMessage = {
@@ -573,12 +601,39 @@ export function ChatView({
         role: "model",
         content: responseText,
         timestamp: new Date(),
+        provider: responseProvider,
       };
 
       const finalMessages = [...freshMessages, replyMsg];
       setMessages(finalMessages);
       saveChatSession(finalMessages, targetChatId);
     } catch (error) {
+      if (
+        dailyUsage.count + 1 < 4 &&
+        isPuterSignedIn() &&
+        isPuterAIFallbackEnabled()
+      ) {
+        try {
+          const puterReply = await chatWithPuterAI({
+            message: promptText,
+            history: [],
+            username: displayName || "Developer",
+          });
+          const puterMsg: ChatMessage = {
+            id: `m-model-puter-${Date.now()}`,
+            role: "model",
+            content: puterReply,
+            timestamp: new Date(),
+            provider: "puter",
+          };
+          const finalPuter = [...freshMessages, puterMsg];
+          setMessages(finalPuter);
+          saveChatSession(finalPuter, targetChatId);
+          return;
+        } catch {
+          // Fall through to busy message
+        }
+      }
       console.error("Error communicating with BUBUBAI:", error);
       const offlineMsg: ChatMessage = {
         id: `m-model-fallback-${Date.now()}`,
@@ -664,6 +719,24 @@ Please try again in a few moments. 🔄
         throw new Error("Failed to parse response. The generation may have timed out.");
       }
 
+      if (
+        responseProvider === "fallback" &&
+        dailyUsage.count + 1 < 4 &&
+        isPuterSignedIn() &&
+        isPuterAIFallbackEnabled()
+      ) {
+        try {
+          responseText = await chatWithPuterAI({
+            message: userPrompt,
+            history: historyPayload,
+            username: displayName || "Developer",
+          });
+          responseProvider = "puter";
+        } catch {
+          // Keep server-busy fallback text
+        }
+      }
+
       const replyMsg: ChatMessage = {
         id: `m-model-${Date.now()}`,
         role: "model",
@@ -676,6 +749,32 @@ Please try again in a few moments. 🔄
       setMessages(finalMessages);
       saveChatSession(finalMessages);
     } catch (err) {
+      if (
+        dailyUsage.count + 1 < 4 &&
+        isPuterSignedIn() &&
+        isPuterAIFallbackEnabled()
+      ) {
+        try {
+          const puterReply = await chatWithPuterAI({
+            message: userPrompt,
+            history: historyPayload,
+            username: displayName || "Developer",
+          });
+          const puterMsg: ChatMessage = {
+            id: `m-model-puter-${Date.now()}`,
+            role: "model",
+            content: puterReply,
+            timestamp: new Date(),
+            provider: "puter",
+          };
+          const finalPuter = [...updatedMessages, puterMsg];
+          setMessages(finalPuter);
+          saveChatSession(finalPuter);
+          return;
+        } catch {
+          // Fall through to busy message
+        }
+      }
       console.error("Reply failed:", err);
       const fallbackReply: ChatMessage = {
         id: `m-model-fallback-${Date.now()}`,
@@ -1736,6 +1835,31 @@ Please try again in a few moments. 🔄
                 >
                   <Server className="w-4 h-4 stroke-[2.5]" />
                   <span>AI Fallbacks</span>
+                </button>
+                <div className="h-[1px] bg-[#ebebe8] w-full my-1" />
+                <button
+                  onClick={async () => {
+                    setShowPopupMenu(false);
+                    try {
+                      if (!isPuterSignedIn()) {
+                        await signInPuter();
+                      }
+                      const firstTitle =
+                        messages.find((m) => m.role === "user")?.content?.slice(0, 40) ||
+                        "BUBUBAI Chat";
+                      await backupChatToPuter(
+                        activeChatId || `chat-${Date.now()}`,
+                        firstTitle,
+                        messages,
+                      );
+                    } catch (err) {
+                      console.warn("Puter backup skipped:", err);
+                    }
+                  }}
+                  className="flex items-center w-full px-4 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50 transition-colors gap-3 justify-start cursor-pointer"
+                >
+                  <Cloud className="w-4 h-4 stroke-[2.5]" />
+                  <span>Save to Puter</span>
                 </button>
                 <div className="h-[1px] bg-[#ebebe8] w-full my-1" />
                 <a
